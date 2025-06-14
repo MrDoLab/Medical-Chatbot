@@ -75,6 +75,15 @@ Remember: You are providing information for medical professionals. Be thorough a
         """MedGemma 모델 로드 시도"""
         print(f"🧠 MedGemma 모델 로딩 중... ({self.device})")
         
+        import os
+        is_cloud = os.environ.get('STREAMLIT_SHARING', '') == 'true'
+
+        # 클라우드 환경에서는 모델 로딩 건너뜀
+        if is_cloud:
+            print("⚠️ Streamlit Cloud 환경 감지: MedGemma 모델 로딩 건너뜀")
+            self.model_loaded = False
+            return
+
         try:
             # Hugging Face 토큰 로드
             import os

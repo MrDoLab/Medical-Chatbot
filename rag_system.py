@@ -6,6 +6,7 @@ from langchain_core.documents import Document
 from langgraph.graph import END, StateGraph
 from langgraph.checkpoint.memory import MemorySaver
 import uuid
+import os
 from datetime import datetime
     
 from config import Config
@@ -61,6 +62,19 @@ class RAGSystem:
         self.config = Config()
         self.llm = ChatOpenAI(model=self.config.MODEL_NAME, temperature=self.config.TEMPERATURE)
         
+        # 클라우드 환경 감지 및 설정
+        self.is_cloud = os.environ.get('STREAMLIT_SHARING', '') == 'true'
+        
+        if self.is_cloud:
+            print("☁️ Streamlit Cloud 환경 감지 - 경량 모드 활성화")
+            # 강제 CPU 모드
+            os.environ["CUDA_VISIBLE_DEVICES"] = ""
+            os.environ["USE_CUDA"] = "0"
+        
+        self.config = Config()
+        self.llm = ChatOpenAI(model=self.config.MODEL_NAME, temperature=self.config.TEMPERATURE)
+
+
         # 핵심 컴포넌트 초기화
         self.router = Router(self.llm)
         self.retriever = Retriever()
