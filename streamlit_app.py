@@ -28,6 +28,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+is_cloud = os.environ.get('STREAMLIT_SHARING', '') == 'true'
+
 # 클라우드 환경에서 PyTorch/딥러닝 관련 오류 방지
 if is_cloud:
     # 잠재적인 오류 발생 모듈 목록
@@ -433,7 +435,6 @@ def display_prompt_management_tab(rag_system, prompt_manager):
 def main():
     """메인 앱"""
     initialize_session_state()
-    is_cloud = os.environ.get('STREAMLIT_SHARING', '') == 'true'
     
     # 헤더
     st.title("🏥 의료 AI 어시스턴트")
