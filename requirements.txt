@@ -15,14 +15,17 @@ plotly>=5.18.0
 streamlit>=1.28.2
 streamlit-chat>=0.1.1
 
-# 문서 처리
+# 문서 처리 - 클라우드 호환
 PyMuPDF>=1.23.7
-pytesseract>=0.3.10
 Pillow>=10.1.0
+# 조건부 설치: 로컬에서만 OCR 관련 패키지 설치
+pytesseract; sys_platform == "win32" or sys_platform == "darwin"
 
-# 딥러닝 및 임베딩
-torch>=2.1.1
+# 딥러닝 및 임베딩 - 경량화 버전
 transformers>=4.35.2
+# torch는 클라우드 환경에서 문제를 일으킬 수 있어 CPU 버전으로 지정
+# 또는 조건부 설치로 로컬에서만 설치
+torch>=2.1.1; sys_platform == "win32" or sys_platform == "darwin"
 sentence-transformers>=2.2.2
 
 # 환경 설정 및 유틸리티
@@ -30,8 +33,3 @@ python-dotenv>=1.0.0
 tqdm>=4.66.1
 requests>=2.31.0
 xmltodict>=0.13.0
-
-# PDF 및 이미지 처리 의존성
-pdf2image>=1.16.3
-poppler-utils; sys_platform != "win32"
-tesseract-ocr; sys_platform != "win32"
