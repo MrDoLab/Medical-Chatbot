@@ -11,6 +11,14 @@ from datetime import datetime
 from components.pdf_processor import PDFProcessor
 from components.text_processor import TextProcessor
 
+try:
+    import pytesseract
+    TESSERACT_AVAILABLE = True
+except ImportError:
+    TESSERACT_AVAILABLE = False
+    print("⚠️ pytesseract 모듈을 찾을 수 없습니다. OCR 기능이 비활성화됩니다.")
+
+
 class DocumentLoader:
     """문서 로딩 총괄 관리자"""
     
@@ -18,6 +26,9 @@ class DocumentLoader:
         """문서 로더 초기화"""
         self.pdf_processor = PDFProcessor()
         self.text_processor = TextProcessor()
+        
+        # OCR 사용 가능 여부
+        self.ocr_available = TESSERACT_AVAILABLE
         
         # 지원 파일 형식 정의
         self.pdf_extensions = ['.pdf']
@@ -36,6 +47,10 @@ class DocumentLoader:
         print("📚 문서 로더 초기화 완료")
         print(f"   📄 PDF 처리기: 준비됨")
         print(f"   📝 텍스트 처리기: 준비됨")
+        
+        if not self.ocr_available:
+            print("   ⚠️ OCR 기능 비활성화됨 (pytesseract 모듈 없음)")
+
     
     def load_documents_from_directory(self, directory_path: str) -> List[Document]:
         """디렉토리에서 모든 문서 로드"""

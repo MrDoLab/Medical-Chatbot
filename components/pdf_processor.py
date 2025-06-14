@@ -5,17 +5,24 @@ PDF 전용 처리기 - 텍스트 추출 + OCR 하이브리드 처리
 
 import fitz  # PyMuPDF
 import pandas as pd
-import pytesseract
-from PIL import Image
-import io
 import re
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 from pathlib import Path
 from langchain_core.documents import Document
 from datetime import datetime
+import io
+from PIL import Image
+
+# 조건부 임포트
+try:
+    import pytesseract
+    TESSERACT_AVAILABLE = True
+except ImportError:
+    TESSERACT_AVAILABLE = False
+    print("⚠️ pytesseract 모듈을 찾을 수 없습니다. OCR 기능이 비활성화됩니다.")
 
 class PDFProcessor:
-    """PDF 문서 전용 처리기 - 텍스트/OCR 하이브리드"""
+    """PDF 문서 전용 처리기 - 텍스트 추출 + OCR 하이브리드 처리"""
     
     def __init__(self):
         """PDF 처리기 초기화"""
@@ -24,7 +31,12 @@ class PDFProcessor:
         self.text_threshold = 200     # 텍스트 추출 성공 임계값 (글자수)
         self.ocr_threshold = 30       # OCR 페이지별 최소 글자수
         
+        # OCR 사용 가능 여부 저장
+        self.ocr_available = TESSERACT_AVAILABLE
+        
         print("📄 PDF 처리기 초기화 완료")
+        if not self.ocr_available:
+            print("   ⚠️ OCR 기능 비활성화됨")
     
     def process_pdf(self, file_path: Path) -> Document:
         """PDF 파일을 Document 객체로 변환 (하이브리드 처리)"""
@@ -124,10 +136,10 @@ class PDFProcessor:
         """2단계: OCR 추출 시도"""
         try:
             # OCR 의존성 체크
-            if not self._check_ocr_dependencies():
+            if not self.ocr_available:
                 return {
                     "success": False,
-                    "error": "OCR 의존성 미설치 (pytesseract, Pillow)"
+                    "error": "OCR 의존성 미설치 (pytesseract)"
                 }
             
             extracted_pages = []
@@ -192,6 +204,11 @@ class PDFProcessor:
                 "success": False,
                 "error": f"OCR 처리 오류: {str(e)}"
             }
+    
+    def _check_ocr_dependencies(self) -> bool:
+        """OCR 의존성 확인"""
+        # 전역 변수 사용
+        return TESSERACT_AVAILABLE
     
     def _extract_tables_from_page(self, page) -> List[str]:
         """페이지에서 표 데이터 추출"""
