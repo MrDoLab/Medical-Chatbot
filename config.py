@@ -25,12 +25,17 @@ class Config:
     
     # 검색 설정
     SEARCH_CONFIG = {
-        "top_k": 5,  # 기본 검색 결과 개수
-        "similarity_threshold": 0.3,  # 유사도 임계값
-        "medical_keywords_boost": True,  # 의료 키워드 가중치 부여
-        "category_filtering": True,  # 카테고리 기반 필터링
-        "emergency_priority": True  # 응급 문서 우선순위
-    }
+    "top_k": 5,  # 기본 검색 결과 개수
+    "similarity_threshold": 0.3,  # 유사도 임계값
+    "medical_keywords_boost": True,  # 의료 키워드 가중치 부여
+    "category_filtering": True,  # 카테고리 기반 필터링
+    "emergency_priority": True,  # 응급 문서 우선순위
+    "enable_web_search": True,   # 웹 검색 활성화
+    "reliable_domains": [        # 신뢰할 수 있는 의료 도메인
+        "pubmed.ncbi.nlm.nih.gov", "mayoclinic.org", "who.int", 
+        "cdc.gov", "nih.gov", "medlineplus.gov", "uptodate.com"
+    ]
+}
     
     # 유사도 임계값 (직접 접근용)
     SIMILARITY_THRESHOLD = 0.3

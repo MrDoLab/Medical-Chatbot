@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class ParallelSearcher:
     """다중 소스 병렬 검색 관리자"""
     
-    def __init__(self, retriever, medgemma_searcher=None):
+    def __init__(self, retriever, medgemma_searcher=None, tavily_searcher=None):
         """
         병렬 검색기 초기화
         
@@ -24,6 +24,7 @@ class ParallelSearcher:
         """
         self.retriever = retriever
         self.medgemma_searcher = medgemma_searcher
+        self.tavily_searcher = tavily_searcher
         
         # 병렬 실행 설정
         self.max_workers = 3
@@ -85,6 +86,14 @@ class ParallelSearcher:
                 "function": self.medgemma_searcher.search_medgemma,
                 "args": [question],
                 "kwargs": {"max_results": 1}
+            }
+        
+        # Tavily 웹 검색 (사용 가능한 경우)
+        if self.tavily_searcher is not None:
+            tasks["web"] = {
+                "function": self.tavily_searcher.search_web,
+                "args": [question],
+                "kwargs": {"max_results": 3}
             }
         
         return tasks

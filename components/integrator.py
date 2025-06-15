@@ -16,7 +16,8 @@ class Integrator:
         self.source_weights = {
             "pubmed": 1.0,    # 최고 신뢰도 (학술 논문)
             "medgemma": 0.9,  # 높은 신뢰도 (의료 특화 AI)
-            "rag": 0.8        # 높은 신뢰도 (큐레이션된 데이터)
+            "rag": 0.8,       # 높은 신뢰도 (큐레이션된 데이터)
+            "web": 0.6        # 중간 신뢰도 (웹 검색)
         }
     
     def _setup_integration_chain(self):

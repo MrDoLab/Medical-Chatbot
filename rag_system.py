@@ -61,19 +61,6 @@ class RAGSystem:
     def __init__(self):
         self.config = Config()
         self.llm = ChatOpenAI(model=self.config.MODEL_NAME, temperature=self.config.TEMPERATURE)
-        
-        # 클라우드 환경 감지 및 설정
-        self.is_cloud = os.environ.get('STREAMLIT_SHARING', '') == 'true'
-        
-        if self.is_cloud:
-            print("☁️ Streamlit Cloud 환경 감지 - 경량 모드 활성화")
-            # 강제 CPU 모드
-            os.environ["CUDA_VISIBLE_DEVICES"] = ""
-            os.environ["USE_CUDA"] = "0"
-        
-        self.config = Config()
-        self.llm = ChatOpenAI(model=self.config.MODEL_NAME, temperature=self.config.TEMPERATURE)
-
 
         # 핵심 컴포넌트 초기화
         self.router = Router(self.llm)
@@ -88,6 +75,21 @@ class RAGSystem:
         self.medgemma_searcher = MedGemmaSearcher()
         self.parallel_searcher = ParallelSearcher(self.retriever, self.medgemma_searcher)
 
+        # Tavily 검색기 초기화
+        from components.tavily_searcher import TavilySearcher
+        self.tavily_searcher = None
+        try:
+            self.tavily_searcher = TavilySearcher()
+            print("✅ Tavily 웹 검색 준비 완료")
+        except Exception as e:
+            print(f"⚠️ Tavily 웹 검색 초기화 실패: {str(e)}")
+        
+        # 병렬 검색기에 Tavily 추가
+        self.parallel_searcher = ParallelSearcher(
+            self.retriever, 
+            self.medgemma_searcher,
+            tavily_searcher=self.tavily_searcher
+        )
 
         # 워크플로우 설정
         self.workflow = None

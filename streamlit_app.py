@@ -28,26 +28,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-is_cloud = os.environ.get('STREAMLIT_SHARING', '') == 'true'
-
-# 클라우드 환경에서 PyTorch/딥러닝 관련 오류 방지
-if is_cloud:
-    # 잠재적인 오류 발생 모듈 목록
-    problematic_modules = [
-        'torch', 'tensorflow', 'transformers', 'sentence_transformers',
-        'huggingface_hub', 'optimum', 'accelerate'
-    ]
-    
-    # sys.modules에서 문제 모듈 제거
-    for module_name in problematic_modules:
-        if module_name in sys.modules:
-            del sys.modules[module_name]
-    
-    # 환경 변수 설정
-    os.environ['DISABLE_MEDGEMMA'] = 'true'
-    os.environ['USE_LIGHTWEIGHT_MODE'] = 'true'
-
-
 # RAG 시스템 로드 (캐시로 한 번만 로드)
 @st.cache_resource
 def load_rag_system():
