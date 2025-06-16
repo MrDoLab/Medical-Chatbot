@@ -48,6 +48,10 @@ class Retriever:
         self.document_embeddings = []
         self.embedding_index = {}
         
+        # 검색 활성화 여부
+        self.local_search_enabled = False
+        self.s3_search_enabled = True
+
         # 검색 통계
         self.search_stats = {
             "api_calls": 0,
@@ -66,17 +70,68 @@ class Retriever:
         # 캐시 파일 경로
         self.embeddings_file = Path("./embeddings_cache.pkl")
         self.documents_file = Path("./documents_cache.pkl")
+
+        # S3 리트리버 (기본값은 None, 외부에서 설정)
+        self.s3_retriever = None
         
         print("🔍 검색기 초기화 중...")
-        self._load_cached_embeddings()
-        print(f"✅ 검색기 준비 완료! 현재 문서: {len(self.medical_documents)}개")
+        if self.local_search_enabled:
+            self._load_cached_embeddings()
+            print(f"✅ 로컬 검색기 준비 완료! 현재 문서: {len(self.medical_documents)}개")
+        else:
+            print("⚠️ 로컬 검색 비활성화 상태로 초기화됨")
     
     def retrieve_documents(self, question: str, k: int = 5) -> List[Document]:
-        """의료 질문에 대한 관련 문서 검색"""
+        """문서 검색 (S3 우선, 로컬은 선택적)"""
         import time
         start_time = time.time()
         
         print(f"==== [SEARCH: {question[:50]}...] ====")
+        
+        documents = []
+        
+        # 1. S3 검색 (활성화된 경우)
+        if self.s3_retriever and self.s3_retriever.enabled:
+            try:
+                s3_docs = self.s3_retriever.retrieve_documents(question, k)
+                documents.extend(s3_docs)
+                print(f"  📊 S3 검색 결과: {len(s3_docs)}개 문서")
+            except Exception as e:
+                logger.error(f"S3 검색 실패: {str(e)}")
+                print(f"  ❌ S3 검색 오류: {str(e)}")
+        
+        # 2. 로컬 검색 (활성화된 경우)
+        if self.local_search_enabled and (len(documents) < k):
+            try:
+                local_docs = self._retrieve_local_documents(question, k - len(documents))
+                documents.extend(local_docs)
+                print(f"  📊 로컬 검색 결과: {len(local_docs)}개 문서")
+            except Exception as e:
+                logger.error(f"로컬 검색 실패: {str(e)}")
+                print(f"  ❌ 로컬 검색 오류: {str(e)}")
+        
+        # 3. 폴백: 검색 결과가 없으면 기본 문서 제공
+        if not documents:
+            documents = self._get_emergency_fallback_docs(question)
+            print("  ⚠️ 검색 결과 없음: 폴백 문서 사용")
+        
+        # 유사도 기준 정렬
+        documents.sort(key=lambda doc: doc.metadata.get('similarity_score', 0.0), reverse=True)
+        
+        # 최대 k개까지 반환
+        result_docs = documents[:k]
+        
+        # 검색 통계 업데이트
+        response_time = time.time() - start_time
+        self._update_search_stats(response_time)
+        
+        print(f"  📊 검색 완료: 총 {len(result_docs)}개 문서")
+        print(f"  ⏱️ 응답시간: {response_time:.2f}초")
+        
+        return result_docs
+
+    def _retrieve_local_documents(self, question: str, k: int = 5) -> List[Document]:
+        """로컬 문서 검색 (내부 메서드)"""
         
         try:
             # 1. 질문 임베딩 생성
@@ -107,27 +162,18 @@ class Retriever:
                     doc.metadata["similarity_score"] = round(similarity, 4)
                     doc.metadata["search_rank"] = len(top_documents) + 1
                     doc.metadata["search_question"] = question
+                    doc.metadata["source_type"] = "local"
                     top_documents.append(doc)
             
             # 6. 의료 관련성 재검증
             filtered_docs = self._medical_relevance_filter(top_documents, question)[:k]
             
-            # 검색 통계 업데이트
-            response_time = time.time() - start_time
-            self._update_search_stats(response_time)
-            
-            print(f"  📊 검색 결과:")
-            print(f"    후보: {len(indices_to_check)}개 → 유사: {len([s for s, _ in similarities if s >= threshold])}개 → 최종: {len(filtered_docs)}개")
-            print(f"    응답시간: {response_time:.2f}초")
-            if filtered_docs:
-                print(f"    최고 유사도: {filtered_docs[0].metadata.get('similarity_score', 0):.3f}")
-            
             return filtered_docs
-            
+        
         except Exception as e:
-            logger.error(f"문서 검색 실패: {str(e)}")
-            return self._get_emergency_fallback_docs(question)
-    
+            logger.error(f"로컬 문서 검색 실패: {str(e)}")
+            return []
+     
     def load_documents_from_directory(self, directory_path: str) -> int:
         """문서 로딩 (DocumentLoader에게 위임)"""
         print(f"📚 문서 로딩 요청: {directory_path}")
@@ -569,6 +615,19 @@ class Retriever:
         self.document_loader.reset_stats()
         
         print("📊 모든 통계가 초기화되었습니다")
+
+    def set_local_search_enabled(self, enabled: bool) -> None:
+        """로컬 검색 활성화/비활성화"""
+        self.local_search_enabled = enabled
+        
+        if enabled and not self.medical_documents:
+            # 활성화 시 문서가 없으면 로드 시도
+            print("  🔄 로컬 검색 활성화: 임베딩 로드 중...")
+            self._load_cached_embeddings()
+            print(f"  ✅ 로컬 검색 활성화 완료! 현재 문서: {len(self.medical_documents)}개")
+        else:
+            status = "활성화" if enabled else "비활성화"
+            print(f"🔧 로컬 검색 상태 변경: {status}")
 
 # 테스트 및 사용 예시
 def test_refactored_retriever():

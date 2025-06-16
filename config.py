@@ -69,13 +69,36 @@ class Config:
 
     # MedGemma 설정
     MEDGEMMA_CONFIG = {
-        "model_name": "google/gemma-2b-it",
-        "device": "auto",
-        "max_response_length": 512,
-        "enable_medgemma": True,
-        "fallback_on_error": True
+    "model_name": "google/medgemma-27b-it",
+    "device": "auto",
+    "max_response_length": 1024,  
+    "enable_medgemma": True,
+    "fallback_on_error": True,
+    "quantization": "4bit",  
+    "model_kwargs": {
+        "low_cpu_mem_usage": True,
+        "load_in_4bit": True,
+        "device_map": "auto"
     }
+}
     
+    # S3 임베딩 설정 추가
+    S3_CONFIG = {
+        "bucket_name": "aws-medical-chatbot",
+        "search_function": "medical-embedding-search",
+        "enabled": True,  # 기본 활성화
+        "cache_ttl_days": 7,  # 캐시 유효 기간
+        "max_retries": 3  # API 실패 시 재시도 횟수
+    }
+
+    # 검색 소스 활성화 상태
+    SEARCH_SOURCES = {
+        "rag": False,     # 로컬 검색 기본 비활성화
+        "s3": True,       # S3 검색 기본 활성화
+        "medgemma": True, # MedGemma 검색 기본 활성화
+        "pubmed": True    # PubMed 검색 기본 활성화
+    }
+
     # 시스템 프롬프트들 (의료 특화)
     ROUTER_SYSTEM_PROMPT = """You are an expert at routing a medical question to a vectorstore or web search. 
     The vectorstore contains medical documents, clinical guidelines, emergency protocols, and treatment procedures. 

@@ -175,8 +175,6 @@ Remember: You are providing information for medical professionals. Be thorough a
         
         return prompt
         
-        return prompt
-    
     def _detect_medical_question_type(self, query: str) -> str:
         """의료 질문 유형 감지"""
         query_lower = query.lower()
@@ -199,11 +197,11 @@ Remember: You are providing information for medical professionals. Be thorough a
         """MedGemma를 사용한 의료 응답 생성"""
         
         try:
-            # 생성 파라미터 설정 (매우 관대하게)
+            # 생성 파라미터 설정
             generation_config = {
                 "max_new_tokens": max_length,
-                "min_length": 20,  # 최소 길이 줄임
-                "temperature": 0.7,  # 더 창의적으로
+                "min_length": 100,  
+                "temperature": 0.7,  
                 "top_p": 0.9,
                 "do_sample": True,
                 "pad_token_id": self.tokenizer.eos_token_id,

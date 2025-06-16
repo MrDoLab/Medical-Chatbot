@@ -14,20 +14,31 @@ logger = logging.getLogger(__name__)
 class ParallelSearcher:
     """다중 소스 병렬 검색 관리자"""
     
-    def __init__(self, retriever, medgemma_searcher=None, tavily_searcher=None):
+    def __init__(self, retriever, medgemma_searcher=None, tavily_searcher=None, s3_retriever=None):
         """
         병렬 검색기 초기화
         
         Args:
             retriever: RAG 검색 담당 (임베딩 기반)
+            tavliy_searcher : Web 검색 담당
             medgemma_searcher: MedGemma 검색 담당 (optional)
+            s3_retriever: S3 임베딩 검색 담당 (optional)
         """
         self.retriever = retriever
         self.medgemma_searcher = medgemma_searcher
         self.tavily_searcher = tavily_searcher
+        self.s3_retriever = s3_retriever
         
+        # 소스별 활성화 상태
+        self.sources_enabled = {
+            "rag": retriever and retriever.local_search_enabled,
+            "medgemma": medgemma_searcher is not None,
+            "s3": s3_retriever is not None and s3_retriever.enabled,
+            "pubmed": retriever and hasattr(retriever, 'pubmed_searcher') and retriever.pubmed_searcher is not None
+        }
+
         # 병렬 실행 설정
-        self.max_workers = 3
+        self.max_workers = 4
         self.timeout = 30  # 각 소스별 타임아웃 (초)
         
         print("🚀 병렬 검색기 초기화 완료")
@@ -65,14 +76,15 @@ class ParallelSearcher:
         """검색 작업 딕셔너리 준비"""
         tasks = {}
         
-        # RAG 검색 (항상 사용 가능)
-        tasks["rag"] = {
-            "function": self.retriever.retrieve_documents,
-            "args": [question],
-            "kwargs": {}
-        }
+        # 로컬 RAG 검색 (활성화된 경우)
+        if self.sources_enabled["rag"]:
+            tasks["rag"] = {
+                "function": self.retriever._retrieve_local_documents,
+                "args": [question],
+                "kwargs": {}
+            }
         
-        # PubMed 검색 (사용 가능한 경우)
+        # PubMed 검색 (활성화된 경우)
         if hasattr(self.retriever, 'pubmed_searcher') and self.retriever.pubmed_searcher:
             tasks["pubmed"] = {
                 "function": self.retriever.pubmed_searcher.search_pubmed,
@@ -80,20 +92,28 @@ class ParallelSearcher:
                 "kwargs": {"max_results": 3}
             }
         
-        # MedGemma 검색 (사용 가능한 경우)
-        if self.medgemma_searcher is not None:
+        # MedGemma 검색 (활성화된 경우)
+        if self.sources_enabled["pubmed"]:
             tasks["medgemma"] = {
                 "function": self.medgemma_searcher.search_medgemma,
                 "args": [question],
                 "kwargs": {"max_results": 1}
             }
         
-        # Tavily 웹 검색 (사용 가능한 경우)
-        if self.tavily_searcher is not None:
+        # Tavily 웹 검색 (활성화된 경우)
+        if self.sources_enabled["medgemma"]:
             tasks["web"] = {
                 "function": self.tavily_searcher.search_web,
                 "args": [question],
                 "kwargs": {"max_results": 3}
+            }
+
+        # S3 검색 (활성화된 경우)
+        if self.sources_enabled["s3"]:
+            tasks["s3"] = {
+                "function": self.s3_retriever.retrieve_documents,
+                "args": [question],
+                "kwargs": {"k": 5}
             }
         
         return tasks
@@ -139,3 +159,21 @@ class ParallelSearcher:
                 results[source] = []
         
         return results
+
+    def set_source_enabled(self, source: str, enabled: bool) -> None:
+        """특정 검색 소스 활성화/비활성화"""
+        if source not in self.sources_enabled:
+            print(f"⚠️ 알 수 없는 소스: {source}")
+            return
+        
+        # 소스별 특수 처리
+        if source == "rag" and self.retriever:
+            self.retriever.set_local_search_enabled(enabled)
+        elif source == "s3" and self.s3_retriever:
+            self.s3_retriever.set_enabled(enabled)
+        
+        # 상태 업데이트
+        self.sources_enabled[source] = enabled
+        
+        status = "활성화" if enabled else "비활성화"
+        print(f"🔧 검색 소스 '{source}' {status} 완료")

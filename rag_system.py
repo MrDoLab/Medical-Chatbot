@@ -84,13 +84,23 @@ class RAGSystem:
         except Exception as e:
             print(f"⚠️ Tavily 웹 검색 초기화 실패: {str(e)}")
         
-        # 병렬 검색기에 Tavily 추가
+        # S3 리트리버 초기화
+        from components.s3_retriever import S3Retriever
+        self.s3_retriever = S3Retriever(
+            bucket_name="aws-medical-chatbot",
+            search_function="medical-embedding-search",
+            region_name="us-east-2",  # 리전 파라미터 추가
+            enabled=True  # S3 검색 기본 활성화
+        )
+
+        # 병렬 검색기 초기화
         self.parallel_searcher = ParallelSearcher(
             self.retriever, 
             self.medgemma_searcher,
-            tavily_searcher=self.tavily_searcher
+            self.tavily_searcher,
+            self.s3_retriever
         )
-
+    
         # 워크플로우 설정
         self.workflow = None
         self.app = None
@@ -361,3 +371,25 @@ class RAGSystem:
             "workflow_nodes": 7,  # 간소화된 노드 수
             **retriever_stats
         }
+    
+    def configure_search_sources(self, sources_config: Dict[str, bool]) -> Dict[str, bool]:
+        """검색 소스 설정 업데이트"""
+        print("==== [CONFIGURE SEARCH SOURCES] ====")
+        
+        # 병렬 검색기 소스 설정
+        for source, enabled in sources_config.items():
+            self.parallel_searcher.set_source_enabled(source, enabled)
+        
+        # 현재 설정 반환
+        return self.parallel_searcher.sources_enabled
+
+    def get_system_status(self) -> Dict[str, Any]:
+        """시스템 상태 및 통계 조회"""
+        status = {
+            "search_sources": self.parallel_searcher.sources_enabled,
+            "retriever_stats": self.retriever.get_stats(),
+            "s3_stats": self.s3_retriever.get_stats() if self.s3_retriever else None,
+            "medgemma_stats": self.medgemma_searcher.get_stats() if self.medgemma_searcher else None,
+        }
+        
+        return status
