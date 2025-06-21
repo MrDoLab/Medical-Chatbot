@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class MedGemmaSearcher:
     """MedGemma 의료 특화 LLM 검색 담당 클래스"""
     
-    def __init__(self, model_name: str = "google/medgemma-4b-it", device: str = "auto"):
+    def __init__(self, model_name: str = "google/gemma_2b_it", device: str = "auto"):
         """
         MedGemma 검색기 초기화
         
@@ -51,7 +51,7 @@ Guidelines:
 Remember: You are providing information for medical professionals. Be thorough and clinically oriented."""
 
         # 모델 로드 시도
-        self.model_loaded = False
+        self.model_loaded = True
         self._try_load_model()
         
         # 검색 통계
@@ -122,9 +122,21 @@ Remember: You are providing information for medical professionals. Be thorough a
                 device_map="auto",
                 trust_remote_code=True,
                 low_cpu_mem_usage=True,
-                token=hf_token
+                token=hf_token,
+                offload_folder="medgemma_offload",
+                offload_state_dict=True
             )
-            
+
+            # 파이프라인 생성 - attention_mask 명시적 처리 설정
+            self.pipeline = pipeline(
+                "text-generation",
+                model=self.model,
+                tokenizer=self.tokenizer,
+                device_map="auto", # device_map을 항상 "auto"로 지정
+                torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
+                trust_remote_code=True
+            )          
+
             # 간단한 테스트
             test_prompt = "안녕하세요, 의료 질문에 답변해주세요."
             input_ids = self.tokenizer(test_prompt, return_tensors="pt").input_ids.to(self.model.device)

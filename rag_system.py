@@ -18,6 +18,7 @@ from components.integrator import Integrator
 from components.output_formatter import OutputFormatter
 from components.memory_manager import MemoryManager
 from components.parallel_searcher import ParallelSearcher
+from components.bedrock_retriever import BedrockRetriever
 
 
 def use_last_value(current_val, new_val):
@@ -72,7 +73,7 @@ class RAGSystem:
         self.memory_manager = MemoryManager(self.llm)
 
         from components.medgemma_searcher import MedGemmaSearcher
-        self.medgemma_searcher = MedGemmaSearcher()
+        self.medgemma_searcher = None
         self.parallel_searcher = ParallelSearcher(self.retriever, self.medgemma_searcher)
 
         # Tavily 검색기 초기화
@@ -86,19 +87,51 @@ class RAGSystem:
         
         # S3 리트리버 초기화
         from components.s3_retriever import S3Retriever
-        self.s3_retriever = S3Retriever(
+        self.s3_retriever = None
+        """
+        S3Retriever(
             bucket_name="aws-medical-chatbot",
             search_function="medical-embedding-search",
             region_name="us-east-2",  # 리전 파라미터 추가
             enabled=True  # S3 검색 기본 활성화
         )
+        """
+
+        # Bedrock Retriever 추가
+        bedrock_kb_id = None
+        bedrock_retriever = None
+        try:
+            if hasattr(self.config, 'BEDROCK_CONFIG'):
+                bedrock_kb_id = self.config.BEDROCK_CONFIG.get("kb_id", "")
+                if bedrock_kb_id:
+                    print(f"📝 Bedrock KB ID 확인됨: {bedrock_kb_id}")
+                    try:
+                        from components.bedrock_retriever import BedrockRetriever
+                        bedrock_retriever = BedrockRetriever(
+                            kb_id=bedrock_kb_id,
+                            region=self.config.BEDROCK_CONFIG.get("region", "us-east-1")
+                        )
+                        print("✅ Bedrock Retriever 초기화 성공")
+                    except Exception as e:
+                        import traceback
+                        print(f"⚠️ Bedrock Retriever 초기화 실패: {str(e)}")
+                        print(traceback.format_exc())
+                        bedrock_retriever = None
+                else:
+                    print("ℹ️ Bedrock KB ID가 설정되지 않았습니다")
+        except Exception as e:
+            print(f"⚠️ Bedrock 설정 확인 실패: {str(e)}")
+        
+        # 클래스에 할당
+        self.bedrock_retriever = bedrock_retriever
 
         # 병렬 검색기 초기화
         self.parallel_searcher = ParallelSearcher(
             self.retriever, 
             self.medgemma_searcher,
             self.tavily_searcher,
-            self.s3_retriever
+            self.s3_retriever,
+            self.bedrock_retriever
         )
     
         # 워크플로우 설정

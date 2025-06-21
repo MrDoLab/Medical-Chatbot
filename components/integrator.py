@@ -14,47 +14,63 @@ class Integrator:
         
         # 소스별 신뢰도 가중치
         self.source_weights = {
-            "pubmed": 1.0,    # 최고 신뢰도 (학술 논문)
-            "medgemma": 0.9,  # 높은 신뢰도 (의료 특화 AI)
-            "rag": 0.8,       # 높은 신뢰도 (큐레이션된 데이터)
-            "web": 0.6        # 중간 신뢰도 (웹 검색)
+            "pubmed": 1.0,     # 최고 신뢰도 (학술 논문)
+            "bedrock_kb": 0.9, # AWS Bedrock KB (높은 신뢰도)
+            "medgemma": 0.9,   # 높은 신뢰도 (의료 특화 AI)
+            "rag": 0.8,        # 높은 신뢰도 (큐레이션된 데이터)
+            "web": 0.6         # 중간 신뢰도 (웹 검색)
         }
     
     def _setup_integration_chain(self):
         """정보 통합 체인 설정"""
         self.integration_prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a medical information integrator. Combine multiple sources to provide accurate medical answers.
+            ("system", """You are a medical information integrator. Combine multiple sources to provide accurate medical answers and ALWAYS cite your sources clearly.
 
-            Source Reliability Guide:
-            - PubMed (Weight: 1.0): Peer-reviewed academic papers - highest reliability
-            - RAG (Weight: 0.8): Curated medical database - high reliability  
-            - Web (Weight: 0.6): General web sources - moderate reliability
-            
-            Integration Guidelines:
-            - Prioritize information by source reliability
-            - Synthesize complementary information from multiple sources
-            - Note any important contradictions between sources
-            - RESPOND IN THE SAME LANGUAGE AS THE USER'S INPUT (Korean for Korean input, English for English input, etc.)
-            - Focus on medical accuracy and patient safety"""),
+        Source Reliability Guide:
+        - PubMed (Weight: 1.0): Peer-reviewed academic papers - highest reliability
+        - Bedrock_kb (Weight: 0.9): Curated medical knowledge base - high reliability 
+        - MedGemma (Weight: 0.9): Medical specialized AI model - high reliability
+        - RAG (Weight: 0.8): Internal medical database - good reliability
+        - Web (Weight: 0.6): General web sources - moderate reliability
+        - S3 (Weight: 0.8): Organization's document storage - good reliability
+
+        Integration and Citation Guidelines:
+        - Prioritize information by source reliability
+        - Synthesize complementary information from multiple sources
+        - For EACH claim or piece of information, ALWAYS include the specific source
+        - Use this citation format: [SOURCE_TYPE: specific source name] after each claim
+        - For web sources, include the website name/URL
+        - For Bedrock KB, include the document title or ID
+        - For PubMed, include the paper title or author
+        - For internal sources (RAG, S3), include the document name/title
+        - Note any important contradictions between sources
+        - RESPOND IN THE SAME LANGUAGE AS THE USER'S INPUT (Korean for Korean input, English for English input, etc.)
+        - Focus on medical accuracy and patient safety
+
+        Example citation format:
+        - Blood pressure should be monitored regularly in hypertensive patients [PubMed: Kim et al., 2023]
+        - Metformin is commonly prescribed as first-line therapy for type 2 diabetes [Bedrock_KB: Diabetes Treatment Guidelines]
+        - Recent studies suggest mindfulness may help reduce chronic pain [Web: Mayo Clinic]
+        """),
             ("human", """Question: {question}
-            
-            Sources with weights:
-            {weighted_content}
-            
-            Provide integrated medical answer:"""),
+
+        Sources with weights:
+        {weighted_content}
+
+        Provide integrated medical answer with clear source citations for each piece of information:"""),
         ])
         
         self.integration_chain = self.integration_prompt | self.llm | StrOutputParser()
     
-    def integrate_answers(self, question: str, categorized_docs: Dict[str, List[Document]]) -> str:
+    def integrate_answers(self, question: str, source_categorized_docs: Dict[str, List[Document]]) -> str:
         """다중 소스 정보를 가중치 적용하여 통합"""
         print("==== [INTEGRATE WITH WEIGHTS] ====")
         
-        if not categorized_docs:
+        if not source_categorized_docs:
             return "관련 정보를 찾을 수 없어 답변을 생성할 수 없습니다."
         
         # 가중치 적용된 내용 구성
-        weighted_content = self._build_weighted_content(categorized_docs)
+        weighted_content = self._build_weighted_content(source_categorized_docs)
         
         try:
             integrated_answer = self.integration_chain.invoke({
@@ -62,12 +78,39 @@ class Integrator:
                 "weighted_content": weighted_content
             })
             
-            print(f"  ✅ 소스 통합 완료 ({len(categorized_docs)}개 소스)")
-            return integrated_answer
+            # 출처 표기 형식 개선
+            enhanced_answer = self._enhance_citations(integrated_answer)
+            
+            print(f"  ✅ 소스 통합 완료 ({len(source_categorized_docs)}개 소스)")
+            return enhanced_answer
             
         except Exception as e:
             print(f"  ❌ 통합 실패: {str(e)}")
-            return self._fallback_integration(categorized_docs)
+            return self._fallback_integration(source_categorized_docs)
+
+    def _enhance_citations(self, answer: str) -> str:
+        """출처 표기 형식 개선"""
+        import re
+        
+        # 출처 표기 강조 및 일관성 유지
+        # [SOURCE_TYPE: specific source] 형식을 일관되게 변환
+        
+        # 정규식 패턴
+        citation_pattern = r'\[((?:PubMed|Web|Bedrock_KB|RAG|S3|MedGemma)[^]]*)\]'
+        
+        # 출처 표기 강조
+        def citation_replacer(match):
+            citation = match.group(1)
+            return f'【{citation}】'
+        
+        # 정규식으로 출처 표기 변환
+        enhanced = re.sub(citation_pattern, citation_replacer, answer)
+        
+        # 출처가 없는 문장에 대한 안내 추가
+        if '【' not in enhanced:
+            enhanced += "\n\n(⚠️ 참고: 이 답변은 제공된 정보를 바탕으로 생성되었으나, 구체적인 출처를 표기하지 않았습니다. 정확한 의료 정보는 의료 전문가와 상담하세요.)"
+        
+        return enhanced
     
     def _build_weighted_content(self, categorized_docs: Dict[str, List[Document]]) -> str:
         """소스별 가중치를 적용한 내용 구성"""
@@ -82,11 +125,95 @@ class Integrator:
             content_parts.append(f"\n=== {source_type.upper()} SOURCES (신뢰도: {weight}) ===")
             
             for i, doc in enumerate(docs):
-                source = doc.metadata.get("source", "unknown")
+                # 소스 유형별 출처 정보 추출
+                source_info = self._extract_source_info(source_type, doc)
                 content = doc.page_content[:300]  # 300자 제한
-                content_parts.append(f"{i+1}. [{source}] {content}")
+                
+                # 출처 정보 포함
+                content_parts.append(f"{i+1}. [{source_info}] {content}")
         
         return "\n".join(content_parts)
+
+    def _extract_source_info(self, source_type: str, doc: Document) -> str:
+        """문서 유형별 출처 정보 추출"""
+        metadata = doc.metadata or {}
+        
+        if source_type == "pubmed":
+            # PubMed 논문 정보
+            authors = metadata.get("authors", [])
+            author_text = f"{authors[0]} 외" if authors and len(authors) > 1 else ", ".join(authors) if authors else "Unknown"
+            year = metadata.get("year", "")
+            journal = metadata.get("journal", "")
+            return f"PubMed: {author_text} ({year}), {journal}"
+        
+        elif source_type == "web":
+            # 웹 출처 정보
+            source = metadata.get("source", "")
+            # URL에서 도메인만 추출
+            import re
+            domain = ""
+            if isinstance(source, str) and "://" in source:
+                match = re.search(r'://([^/]+)', source)
+                if match:
+                    domain = match.group(1)
+                    # www. 제거
+                    domain = re.sub(r'^www\.', '', domain)
+            
+            return f"Web: {domain or source or 'Unknown website'}"
+        
+        elif source_type == "bedrock_kb":
+            # Bedrock KB 문서 정보 - 더 구체적인 정보
+            title = metadata.get("title", "")
+            doc_id = metadata.get("document_id", "")
+            category = metadata.get("category", "")
+            
+            # Document만 표시되는 경우 내용에서 제목 추출 시도
+            if not title and not doc_id:
+                content = doc.page_content or ""
+                # 첫 줄이나 첫 10단어를 제목으로 사용
+                first_line = content.split('\n')[0] if '\n' in content else ""
+                content_preview = first_line[:50] if first_line else " ".join(content.split()[:7])
+                
+                if content_preview:
+                    return f"Bedrock KB: {content_preview}..."
+            
+            return f"Bedrock KB: {title or doc_id or category or 'Medical document'}"
+        
+        elif source_type == "s3":
+            # S3 문서 정보
+            path = metadata.get("source", "")
+            title = metadata.get("title", "")
+            # 경로에서 파일명만 추출
+            if isinstance(path, str):
+                import os
+                filename = os.path.basename(path)
+            else:
+                filename = ""
+            
+            return f"S3: {title or filename or 'Document'}"
+        
+        elif source_type == "rag":
+            # 내부 RAG 문서 정보
+            source = metadata.get("source", "")
+            title = metadata.get("title", "")
+            category = metadata.get("category", "")
+            
+            # 소스에서 파일명만 추출
+            if isinstance(source, str):
+                import os
+                filename = os.path.basename(source)
+            else:
+                filename = ""
+            
+            return f"RAG: {title or filename or category or 'Document'}"
+        
+        elif source_type == "medgemma":
+            # MedGemma 정보
+            model = metadata.get("model_name", "MedGemma")
+            return f"MedGemma: {model}"
+        
+        # 기본 출처 정보
+        return f"{source_type}: {metadata.get('source', 'Unknown')}"
     
     def _fallback_integration(self, categorized_docs: Dict[str, List[Document]]) -> str:
         """통합 실패 시 폴백 방법"""

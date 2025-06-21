@@ -69,11 +69,11 @@ class Config:
 
     # MedGemma 설정
     MEDGEMMA_CONFIG = {
-        "model_name": "medgemma-4b-it",  # 또는 사용 중인 모델
+        "model_name": "google/gemma-2b-it",  # 또는 사용 중인 모델
         "device": "auto",
         "max_response_length": 1024,  # 충분히 긴 응답 허용
         "min_response_length": 100,   # 최소 응답 길이 지정
-        "enable_medgemma": True,
+        "enable_medgemma": False,
         "fallback_on_error": True,
         "generation_params": {
             "temperature": 0.8,
@@ -92,6 +92,23 @@ class Config:
         }
     }
     
+    # AWS Bedrock 설정
+    BEDROCK_CONFIG = {
+        "kb_id": "IZJR1RYKEY",  # 실제 KB ID로 변경
+        "region": "us-east-2",  # 실제 리전으로 변경
+        "enabled": True,  # Bedrock 검색 활성화 여부
+        "confidence_threshold": 0.3  # 최소 신뢰도 임계값
+    }
+    
+    # 검색 소스 가중치 업데이트 (Bedrock 추가)
+    SEARCH_WEIGHTS = {
+        "rag": 0.7,            # 기존 벡터 검색
+        "medgemma": 0.6,       # MedGemma
+        "pubmed": 0.8,         # PubMed
+        "bedrock_kb": 0.9      # Bedrock KB (높은 가중치)
+    }
+    
+
     # S3 임베딩 설정 추가
     S3_CONFIG = {
         "bucket_name": "aws-medical-chatbot",
@@ -105,7 +122,7 @@ class Config:
     SEARCH_SOURCES = {
         "rag": False,     # 로컬 검색 기본 비활성화
         "s3": True,       # S3 검색 기본 활성화
-        "medgemma": True, # MedGemma 검색 기본 활성화
+        "medgemma": False, # MedGemma 검색 기본 활성화
         "pubmed": True    # PubMed 검색 기본 활성화
     }
 
