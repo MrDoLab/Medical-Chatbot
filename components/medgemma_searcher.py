@@ -5,13 +5,15 @@ from datetime import datetime
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 import logging
+import os
+from huggingface_hub import login
 
 logger = logging.getLogger(__name__)
 
 class MedGemmaSearcher:
     """MedGemma 의료 특화 LLM 검색 담당 클래스"""
     
-    def __init__(self, model_name: str = "microsoft/DialoGPT-medium", device: str = "auto"):
+    def __init__(self, model_name: str = "google/medgemma-4b-it", device: str = "auto"):
         """
         MedGemma 검색기 초기화
         
@@ -19,6 +21,7 @@ class MedGemmaSearcher:
             model_name: 사용할 Gemma 모델명 (의료 파인튜닝 버전 권장)
             device: 실행 디바이스 ("auto", "cpu", "cuda")
         """
+
         self.model_name = model_name
         self.device = self._get_device(device)
         
@@ -74,7 +77,7 @@ Remember: You are providing information for medical professionals. Be thorough a
     def _try_load_model(self):
         """MedGemma 모델 로드 시도"""
         print(f"🧠 MedGemma 모델 로딩 중... ({self.device})")
-
+        
         try:
             # Hugging Face 토큰 로드
             import os
@@ -82,16 +85,29 @@ Remember: You are providing information for medical professionals. Be thorough a
             load_dotenv()
             
             hf_token = os.getenv("HUGGINGFACE_HUB_TOKEN")
-            if hf_token:
-                print("✅ Hugging Face 토큰 확인됨")
-            else:
+            if not hf_token:
                 print("⚠️ Hugging Face 토큰이 없습니다")
             
+            # 모델 경로 확인 (로컬 캐시 확인)
+            from huggingface_hub import snapshot_download
+            print("🔍 모델 캐시 확인 중...")
+            try:
+                model_path = snapshot_download(
+                    repo_id=self.model_name,
+                    token=hf_token,
+                    local_files_only=True  # 로컬 캐시만 확인
+                )
+                print(f"✅ 로컬 캐시에서 모델 발견: {model_path}")
+            except Exception:
+                print("⚠️ 로컬 캐시에 모델 없음, 다운로드 필요")
+                model_path = self.model_name
+            
             # 토크나이저 로드
+            print("🔄 토크나이저 로드 중...")
             self.tokenizer = AutoTokenizer.from_pretrained(
-                self.model_name,
+                model_path,
                 trust_remote_code=True,
-                token=hf_token  # 토큰 명시적 전달
+                token=hf_token
             )
             
             # 패딩 토큰 설정
@@ -99,24 +115,23 @@ Remember: You are providing information for medical professionals. Be thorough a
                 self.tokenizer.pad_token = self.tokenizer.eos_token
             
             # 모델 로드 (메모리 효율적으로)
+            print("🔄 모델 로드 중...")
             self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_name,
+                model_path,
                 torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
-                device_map="auto" if self.device == "cuda" else None,
+                device_map="auto",
                 trust_remote_code=True,
                 low_cpu_mem_usage=True,
-                token=hf_token  # 토큰 명시적 전달
+                token=hf_token
             )
             
-            # 파이프라인 생성
-            self.pipeline = pipeline(
-                "text-generation",
-                model=self.model,
-                tokenizer=self.tokenizer,
-                device=self.device if self.device != "auto" else None,
-                torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
-                trust_remote_code=True
-            )
+            # 간단한 테스트
+            test_prompt = "안녕하세요, 의료 질문에 답변해주세요."
+            input_ids = self.tokenizer(test_prompt, return_tensors="pt").input_ids.to(self.model.device)
+            with torch.no_grad():
+                test_output = self.model.generate(input_ids, max_new_tokens=20)
+            test_response = self.tokenizer.decode(test_output[0], skip_special_tokens=True)
+            print(f"✅ 테스트 응답: '{test_response}'")
             
             self.model_loaded = True
             print(f"✅ MedGemma 모델 로드 완료 ({self.device})")
@@ -127,7 +142,7 @@ Remember: You are providing information for medical professionals. Be thorough a
             self.model_loaded = False
     
     def search_medgemma(self, query: str, max_results: int = 3, max_length: int = 512) -> List[Document]:
-        """MedGemma를 사용한 의료 지식 검색 (PubMedSearcher 패턴 호환)"""
+        """MedGemma를 사용한 의료 지식 검색"""
         print(f"==== [MEDGEMMA SEARCH: {query}] ====")
         
         self.search_stats["queries_processed"] += 1
@@ -137,11 +152,22 @@ Remember: You are providing information for medical professionals. Be thorough a
             return self._create_fallback_documents(query)
         
         try:
+            # 모델 메모리 상태 확인
+            if torch.cuda.is_available():
+                print(f"  🔍 CUDA 메모리: {torch.cuda.memory_allocated()/1024**2:.1f}MB / {torch.cuda.memory_reserved()/1024**2:.1f}MB")
+            
             # 의료 특화 프롬프트 구성
             medical_prompt = self._build_medical_prompt(query)
             
             # MedGemma 추론 실행
             response = self._generate_medical_response(medical_prompt, max_length)
+
+            # 디버깅용 전체 응답 출력
+            print(f"\n====== MEDGEMMA 전체 응답 시작 ======")
+            print(f"{response}")
+            print(f"====== MEDGEMMA 전체 응답 끝 ======\n")
+            
+            print(f"  🔍 응답 길이: {len(response) if response else 0}자")
             
             if response and len(response.strip()) > 10:  # 최소 길이 확인
                 # Document 객체로 변환
@@ -154,6 +180,12 @@ Remember: You are providing information for medical professionals. Be thorough a
                 return [document]
             else:
                 print(f"  ❌ MedGemma 응답이 너무 짧음: '{response}'")
+                # 실패 이유 분석
+                if not response:
+                    print("  🔍 응답이 None임")
+                elif len(response.strip()) <= 10:
+                    print(f"  🔍 응답이 너무 짧음: '{response}'")
+                
                 self.search_stats["failed_generations"] += 1
                 return self._create_fallback_documents(query)
                 
@@ -163,16 +195,23 @@ Remember: You are providing information for medical professionals. Be thorough a
             self.search_stats["failed_generations"] += 1
             return self._create_fallback_documents(query)
     
+
     def _build_medical_prompt(self, query: str) -> str:
-        """의료 질문을 위한 프롬프트 구성 (단순화)"""
+        """의료 질문을 위한 프롬프트 구성"""
         
-        # 단순한 프롬프트로 변경
         prompt = f"""다음은 의료진을 위한 질문입니다. 상세하고 정확한 답변을 한국어로 제공해주세요.
 
-질문: {query}
+            아래 항목을 포함하여 상세히 답변해주세요:
 
-답변:"""
-        
+            관련 의학적 개념 설명
+            진단 또는 치료 방법
+            주의사항이나 고려할 점
+            최신 의료 지침 (가능한 경우)
+
+            질문: {query}
+
+            답변:"""
+    
         return prompt
         
     def _detect_medical_question_type(self, query: str) -> str:
@@ -197,51 +236,57 @@ Remember: You are providing information for medical professionals. Be thorough a
         """MedGemma를 사용한 의료 응답 생성"""
         
         try:
-            # 생성 파라미터 설정
-            generation_config = {
-                "max_new_tokens": max_length,
-                "min_length": 100,  
-                "temperature": 0.7,  
-                "top_p": 0.9,
-                "do_sample": True,
-                "pad_token_id": self.tokenizer.eos_token_id,
-                "repetition_penalty": 1.1
-            }
-            
             print(f"    🤖 MedGemma 추론 시작... (max_tokens: {max_length})")
             print(f"    📋 프롬프트: '{prompt[:200]}...'")
             
-            # 간단한 테스트 먼저
-            try:
-                test_output = self.pipeline("안녕하세요", max_new_tokens=10, do_sample=False)
-                print(f"    🧪 기본 테스트: '{test_output[0]['generated_text']}'")
-            except Exception as e:
-                print(f"    ❌ 기본 테스트 실패: {str(e)}")
+            # 토크나이저 설정 확인
+            inputs = self.tokenizer(prompt, return_tensors="pt", padding=True).to(self.device)
             
-            # 응답 생성
-            outputs = self.pipeline(
-                prompt,
-                **generation_config,
-                return_full_text=False
-            )
+            # 직접 모델 generate 메서드 사용 (파이프라인 대신)
+            with torch.no_grad():
+                output_ids = self.model.generate(
+                    inputs.input_ids,
+                    max_new_tokens=max_length,
+                    min_new_tokens=100,  # 최소 토큰 수 설정
+                    do_sample=True,
+                    temperature=0.8,  # 높은 온도 설정
+                    top_p=0.9,
+                    repetition_penalty=1.2,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                    eos_token_id=self.tokenizer.eos_token_id,
+                )
             
-            print(f"    🔍 파이프라인 출력 타입: {type(outputs)}")
-            print(f"    🔍 파이프라인 출력 길이: {len(outputs) if outputs else 0}")
+            # 디코딩
+            generated_text = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
             
-            if outputs and len(outputs) > 0:
-                generated_text = outputs[0]["generated_text"]
-                print(f"    📝 원본 응답: '{generated_text[:100]}...'")
-                print(f"    📝 원본 응답 길이: {len(generated_text)}자")
+            # 프롬프트 제거
+            if generated_text.startswith(prompt):
+                generated_text = generated_text[len(prompt):].strip()
+            
+            print(f"    📝 원본 응답 길이: {len(generated_text)}자")
+            print(f"    📝 원본 응답 시작 부분: '{generated_text[:100]}...'")
+            
+            if len(generated_text) < 10:  # 응답이 너무 짧으면
+                print(f"    ⚠️ 응답이 너무 짧음, 재시도...")
+                # 재시도 로직 (온도 변경)
+                with torch.no_grad():
+                    output_ids = self.model.generate(
+                        inputs.input_ids,
+                        max_new_tokens=max_length,
+                        min_new_tokens=150,
+                        do_sample=True,
+                        temperature=1.0,  # 더 높은 온도
+                        top_p=0.95,
+                        repetition_penalty=1.3,
+                    )
+                generated_text = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
+                if generated_text.startswith(prompt):
+                    generated_text = generated_text[len(prompt):].strip()
+            
+            # 응답 정리
+            cleaned_response = self._clean_medical_response(generated_text)
+            return cleaned_response
                 
-                # 응답 후처리
-                cleaned_response = self._clean_medical_response(generated_text)
-                print(f"    ✨ 정리된 응답 길이: {len(cleaned_response)}자")
-                
-                return cleaned_response
-            else:
-                print(f"    ❌ 파이프라인 출력이 비어있음")
-                return None
-            
         except Exception as e:
             logger.error(f"응답 생성 실패: {str(e)}")
             print(f"    ❌ 응답 생성 오류: {str(e)}")

@@ -69,18 +69,28 @@ class Config:
 
     # MedGemma 설정
     MEDGEMMA_CONFIG = {
-    "model_name": "google/medgemma-27b-it",
-    "device": "auto",
-    "max_response_length": 1024,  
-    "enable_medgemma": True,
-    "fallback_on_error": True,
-    "quantization": "4bit",  
-    "model_kwargs": {
-        "low_cpu_mem_usage": True,
-        "load_in_4bit": True,
-        "device_map": "auto"
+        "model_name": "medgemma-4b-it",  # 또는 사용 중인 모델
+        "device": "auto",
+        "max_response_length": 1024,  # 충분히 긴 응답 허용
+        "min_response_length": 100,   # 최소 응답 길이 지정
+        "enable_medgemma": True,
+        "fallback_on_error": True,
+        "generation_params": {
+            "temperature": 0.8,
+            "top_p": 0.9,
+            "repetition_penalty": 1.2,
+            "do_sample": True,
+            "num_return_sequences": 1,
+            "num_beams": 1,
+            "early_stopping": True
+        },
+        "memory_optimization": {
+            "load_in_8bit": False,
+            "load_in_4bit": True,
+            "use_flash_attention": True,
+            "low_cpu_mem_usage": True
+        }
     }
-}
     
     # S3 임베딩 설정 추가
     S3_CONFIG = {
