@@ -10,7 +10,6 @@ import os
 from datetime import datetime
     
 from config import Config
-from components.router import Router
 from components.retriever import Retriever
 from components.evaluator import Evaluator
 from components.generator import Generator
@@ -46,7 +45,6 @@ class GraphState(BaseModel):
     user_id: str = "default_user"
 
     conversation_history: Annotated[List[Dict[str, Any]], append_messages] = []
-    routing_decision: Optional[str] = None
     generation_decision: Optional[str] = None
     hallucination_decision: Optional[str] = None
     
@@ -64,7 +62,6 @@ class RAGSystem:
         self.llm = ChatOpenAI(model=self.config.MODEL_NAME, temperature=self.config.TEMPERATURE)
 
         # 핵심 컴포넌트 초기화
-        self.router = Router(self.llm)
         self.retriever = Retriever()
         self.evaluator = Evaluator(self.llm)
         self.generator = Generator(self.llm)
@@ -146,7 +143,6 @@ class RAGSystem:
         
         # 핵심 노드만 설정 (7개)
         self.workflow.add_node("process_question", self._process_question)
-        self.workflow.add_node("route_question", self._route_question)
         self.workflow.add_node("retrieve", self._retrieve)
         self.workflow.add_node("parallel_search", self._parallel_search)
         self.workflow.add_node("integrate_answers", self._integrate_answers)
@@ -155,13 +151,8 @@ class RAGSystem:
 
         # 간소화된 엣지 설정
         self.workflow.set_entry_point("process_question")
-        self.workflow.add_edge("process_question", "route_question")
         
-        self.workflow.add_conditional_edges(
-            "route_question",
-            self._get_route,
-            {"web_search": "parallel_search", "vectorstore": "retrieve"}
-        )
+        self.workflow.add_edge("process_question", "retrieve")
         
         self.workflow.add_edge("retrieve", "parallel_search")
         self.workflow.add_edge("parallel_search", "integrate_answers")
@@ -207,17 +198,6 @@ class RAGSystem:
             "question": enhanced_question,  # 재생성된 질문으로 검색/답변
             "original_question": original_question
         }
-
-    def _route_question(self, state: GraphState) -> Dict[str, Any]:
-        """질문 라우팅"""
-        print("==== [ROUTE QUESTION] ====")
-        routing_decision = self.router.route_question(state.question)
-        print(f"라우팅 결정: {routing_decision}")
-        return {"routing_decision": routing_decision}
-    
-    def _get_route(self, state: GraphState) -> str:
-        """라우팅 결정 반환"""
-        return state.routing_decision
     
     def _retrieve(self, state: GraphState) -> Dict[str, Any]:
         """벡터 검색 (유사도 임계값 적용)"""
@@ -384,7 +364,6 @@ class RAGSystem:
         
         try:
             # 주요 컴포넌트 재초기화
-            self.router = Router(self.llm)
             self.evaluator = Evaluator(self.llm)
             self.generator = Generator(self.llm)
             self.integrator = Integrator(self.llm)
@@ -401,7 +380,7 @@ class RAGSystem:
         retriever_stats = self.retriever.get_stats()
         
         return {
-            "workflow_nodes": 7,  # 간소화된 노드 수
+            "workflow_nodes": 6,  # 간소화된 노드 수
             **retriever_stats
         }
     
