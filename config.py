@@ -24,7 +24,7 @@ class Config:
             "pubmed": 1.0,      # 학술 논문
             "bedrock_kb": 0.95, # Bedrock Knowledge Base
             "local": 0.9,       # 로컬 문서
-            "s3": 0.85,         # S3 저장 문서
+            "s3": 0.9,         # S3 저장 문서
             "medgemma": 0.8,    # 의료 특화 AI
             "tavily": 0.7       # 웹 검색
         }
