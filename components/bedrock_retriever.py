@@ -4,7 +4,7 @@ from langchain_core.documents import Document
 import boto3
 
 class BedrockRetriever:
-    def __init__(self, kb_id, region="us-east-1"):
+    def __init__(self, kb_id=None, region="us-east-1"):
         self.kb_id = kb_id
         self.region = region
         self.bedrock_agent = boto3.client('bedrock-agent-runtime', region_name=region)

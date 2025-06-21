@@ -24,7 +24,7 @@ from PIL import Image
 
 # 페이지 설정
 st.set_page_config(
-    page_title="wku medical chatbot",
+    page_title="WKU MedLink",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -33,14 +33,13 @@ st.markdown("""
     <style>
     /* 기본 탭 스타일 */
     .stTabs [data-baseweb="tab"] {
-    font-size: 17px !important;
+    font-size: 24px !important;
     color: #2c3e50;
     background-color: #f0f6fb;
-    margin-right: 10px;
-    padding: 10px 20px;
+    padding: 20px 90px;
     border-top: 2px solid transparent;
     border-bottom: none;
-    border-radius: 8px 8px 0 0;
+    border-radius: 10px 10px 10px 10px;
     transition: background-color 0.3s ease;
     }
 
@@ -55,7 +54,6 @@ st.markdown("""
     background-color: #7dbdf5 !important;
     color: white !important;
     font-weight: 600 !important;
-    border-top: 2px solid #5ea3e0 !important;  /* 빨간선 → 파란색으로 */
     border-bottom: none;
     }
 
@@ -79,24 +77,23 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-
 def render_chat_bubble(role: str, text: str):
-    if role == "user":
-        bubble_color= "#e8f0fe"
-        align = "right"
-    else:
-        bubble_color="#f1f3f4"
-        align="left"
+    icon = "🙋" if role == "user" else "🤖"
+    align = "right" if role == "user" else "left"
+    bubble_color = "#e0f2ff" if role == "user" else "#f5f5f5"
+    border_color = "#a4cafe" if role == "user" else "#e2e8f0"
+
     
     st.markdown(f"""
-    <div style='text-align: {align}; margin-bottom: 10px;'>
-        <div style='display: inline-block; background-color:{bubble_color}; padding:12px 16px;
-            border-radius: 12px; max-width: 85%;
-            font-size:15px; color: #333;'>
-            {text}
+        <div style='text-align: {align}; margin: 10px 0;'>
+            <div style='display: inline-block; background-color: {bubble_color};
+                        border-left: 5px solid {border_color}; padding: 12px 16px;
+                        border-radius: 12px; max-width: 80%; font-size: 15px;
+                        color: #333;'>
+                <b>{icon} {'나' if role == "user" else 'Woni'}</b><br>{text}
+            </div>
         </div>
-    </div>
-    """,unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
     
 # RAG 시스템 로드 (캐시로 한 번만 로드)
 @st.cache_resource
@@ -455,9 +452,7 @@ def main():
     """메인 앱"""
     initialize_session_state()
     
-    # 헤더
-    #st.markdown("<h3 style='margin-bottom: 5px;'>Medical Chatbot</h3>", unsafe_allow_html=True)
-    st.title("Medical Chatbot")
+    st.title("MedLink")
     st.markdown("<div style='margin-bottom: 30px;'></div>", unsafe_allow_html=True)
     # RAG 시스템 로드
     rag_system = load_rag_system()
@@ -480,14 +475,14 @@ def main():
         - 심정지 환자 CPR 방법은?
         
         **주의사항:**
-        - 응급상황시 119 신고 필수
+        - 5자 이상의 구체적인 질문을 입력해주세요
         - AI 답변은 참고용이며 전문의 진료 필요
         """)
         
         st.markdown("---")
         
         # 접속자 정보
-        st.header("👥 접속 정보")
+        st.header("User Info")
         st.write(f"**사용자 ID:** {st.session_state.user_id}")
         st.write(f"**질문 수:** {len(st.session_state.conversation_history)}개")
         
@@ -500,52 +495,58 @@ def main():
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["질문", "분석", "설정", "프롬프트", "통계"])
     
     with tab1:
-        
-        #st.header("질문을 입력하세요")
+        # 👋 인사말
         st.markdown("""
-        <div style= '
+        <div style='
             border: 1px solid #bcd;
             border-radius: 12px;
             padding: 20px;
             background-color: #f2f8fc;
             margin-top: 20px;
-            '>원광대학교 병원 AI기반 챗봇서비스 입니다. 궁금한 의료정보를 입력 후, 답변요청 버튼을 눌러주세요</div>
-            """, unsafe_allow_html = True)       
+        '>안녕하세요, 원광대학교 병원 AI Woni 입니다. 무엇이 궁금하신가요?</div>
+        """, unsafe_allow_html=True)
 
-        # 질문 입력
+        # 📝 질문 입력창
+# 📝 질문 입력창 (div 시작 → 입력창 → div 끝까지 한 블럭에)
+        st.markdown("""
+        <div style='
+            margin-top: 40px;
+        '>
+        """, unsafe_allow_html=True)
+
         question = st.text_area(
             label="",
-            placeholder="궁금한 점을 입력하세요",
+            placeholder="질문을 입력하세요. (예: 당뇨병 관리 방법은?)",
             height=100,
-            key ="chat_input"
-            #label_visibility="collapsed"
+            key="chat_input",
+            label_visibility="collapsed"
         )
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
+        # 버튼
         col1, col2, _ = st.columns([1.2, 1.2, 3])
-        
         with col1:
-            submit_button = st.button("답변 요청", type="primary")
-        
+            submit_button = st.button("질문하기", type="primary")
         with col2:
             clear_button = st.button("입력 초기화")
-        
+
         if clear_button:
             st.rerun()
-        
-        # 답변 생성
+
+        answer = None  # 답변 초기화
         if submit_button and question.strip():
             if len(question.strip()) < 5:
                 st.warning("⚠️ 더 구체적인 질문을 입력해주세요.")
             else:
-                with st.spinner("🤔 답변을 생성하고 있습니다..."):
+                with st.spinner("Woni가 답변을 준비 중입니다..."):
                     try:
                         start_time = time.time()
-                        
-                        # RAG 시스템으로 답변 생성
                         result = rag_system.run_graph(question, st.session_state.user_id)
-                        
                         end_time = time.time()
                         response_time = end_time - start_time
-                        
+
                         # 결과 처리
                         if isinstance(result, dict):
                             answer = result.get("answer", str(result))
@@ -553,89 +554,62 @@ def main():
                         else:
                             answer = str(result)
                             sources_count = 0
-                        
-                        # 답변 표시
-                        st.success("✅ 답변이 생성되었습니다!")
-                        
-                        # 답변 상자
-                        with st.container():
-                            st.markdown("### 🏥 답변:")
-                            st.markdown(f'<div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; border-left: 5px solid #1f77b4;">{answer}</div>', unsafe_allow_html=True)
-                        
-                        # 메타 정보
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.metric("⏱️ 응답시간", f"{response_time:.1f}초")
-                        with col2:
-                            st.metric("📚 참고 문서", f"{sources_count}개")
-                        with col3:
-                            current_time = datetime.now().strftime("%H:%M:%S")
-                            st.metric("🕐 생성시간", current_time)
-                        
+
                         # 대화 저장
                         save_conversation(question, answer, response_time, sources_count)
-                        
-                        # 사용자 피드백
-                        st.markdown("---")
-                        st.subheader("⭐ 답변 평가")
-                        
-                        col1, col2, col3, col4 = st.columns(4)
-                        
-                        feedback_given = False
-                        
-                        with col1:
-                            if st.button("😊 매우 좋음"):
-                                save_feedback(question, answer, "excellent")
-                                st.success("피드백 감사합니다! 😊")
-                                feedback_given = True
-                        
-                        with col2:
-                            if st.button("👍 좋음"):
-                                save_feedback(question, answer, "good")
-                                st.success("피드백 감사합니다! 👍")
-                                feedback_given = True
-                        
-                        with col3:
-                            if st.button("😐 보통"):
-                                save_feedback(question, answer, "average")
-                                st.info("피드백 감사합니다! 😐")
-                                feedback_given = True
-                        
-                        with col4:
-                            if st.button("😞 별로"):
-                                save_feedback(question, answer, "poor")
-                                st.warning("피드백 감사합니다! 개선하겠습니다. 😞")
-                                feedback_given = True
-                        
-                        # 추가 피드백
-                        if feedback_given:
-                            additional_feedback = st.text_area("추가 의견이 있으시면 입력해주세요:", key="additional_feedback")
-                            if st.button("의견 제출") and additional_feedback:
-                                # 마지막 피드백 업데이트
-                                if st.session_state.user_feedback:
-                                    st.session_state.user_feedback[-1]['feedback_text'] = additional_feedback
-                                st.success("추가 의견이 저장되었습니다!")
-                        
+
                     except Exception as e:
                         st.error(f"❌ 답변 생성 중 오류가 발생했습니다: {str(e)}")
                         st.info("💡 잠시 후 다시 시도해주세요.")
-        
+
         elif submit_button:
             st.warning("⚠️ 질문을 입력해주세요.")
-        
-        # 최근 질문들 표시
+
+        # 💬 최근 대화 (최신 질문 포함)
         if st.session_state.conversation_history:
             st.markdown("---")
-            st.subheader("📝 최근 질문들")
-            
             for conv in st.session_state.conversation_history[-5:]:
                 render_chat_bubble("user", conv['question'])
-                render_chat_bubble("assistant", conv['answer'][:300])
-            #for i, conv in enumerate(reversed(st.session_state.conversation_history[-3:])):
-                #with st.expander(f"Q{len(st.session_state.conversation_history)-i}: {conv['question'][:60]}..."):
-                    #st.write(f"**질문:** {conv['question']}")
-                    #st.write(f"**답변:** {conv['answer'][:300]}...")
-                    #st.write(f"**응답시간:** {conv['response_time']:.1f}초")
+                render_chat_bubble("assistant", conv['answer'])
+
+        # 🌟 피드백
+        if answer:
+            st.markdown("---")
+            st.subheader("답변이 마음에 드셨나요?")
+            col1, col2, col3, col4 = st.columns(4)
+            feedback_given = False
+
+            with col1:
+                if st.button("😊 매우 좋음"):
+                    save_feedback(question, answer, "excellent")
+                    st.success("피드백 감사합니다! 😊")
+                    feedback_given = True
+
+            with col2:
+                if st.button("👍 좋음"):
+                    save_feedback(question, answer, "good")
+                    st.success("피드백 감사합니다! 👍")
+                    feedback_given = True
+
+            with col3:
+                if st.button("😐 보통"):
+                    save_feedback(question, answer, "average")
+                    st.info("피드백 감사합니다! 😐")
+                    feedback_given = True
+
+            with col4:
+                if st.button("😞 별로"):
+                    save_feedback(question, answer, "poor")
+                    st.warning("피드백 감사합니다! 개선하겠습니다. 😞")
+                    feedback_given = True
+
+            if feedback_given:
+                additional_feedback = st.text_area("추가 의견이 있으시면 입력해주세요:", key="additional_feedback")
+                if st.button("의견 제출") and additional_feedback:
+                    if st.session_state.user_feedback:
+                        st.session_state.user_feedback[-1]['feedback_text'] = additional_feedback
+                    st.success("추가 의견이 저장되었습니다!")
+
     
     with tab2:
         st.header("📈 대화 분석")

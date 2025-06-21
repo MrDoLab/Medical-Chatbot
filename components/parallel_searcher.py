@@ -1,54 +1,62 @@
 # components/parallel_searcher.py
 """
 병렬 검색 전용 클래스 - 다중 소스 동시 검색 관리
-RAG + PubMed + MedGemma 를 진짜 병렬로 실행
 """
 
-from typing import Dict, List
+from typing import Dict, List, Any, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from langchain_core.documents import Document
 import logging
+
+from config import Config
 
 logger = logging.getLogger(__name__)
 
 class ParallelSearcher:
     """다중 소스 병렬 검색 관리자"""
     
-    def __init__(self, retriever=None, medgemma_searcher=None, tavily_searcher=None, s3_retriever=None, bedrock_retriever=None):
+    def __init__(self, 
+                 local_retriever=None, 
+                 medgemma_searcher=None,
+                 pubmed_searcher=None,
+                 tavily_searcher=None, 
+                 s3_retriever=None, 
+                 bedrock_retriever=None):
         """
         병렬 검색기 초기화
         
         Args:
-            retriever: RAG 검색 담당 (임베딩 기반)
-            tavliy_searcher : Web 검색 담당
-            medgemma_searcher: MedGemma 검색 담당 (optional)
-            s3_retriever: S3 임베딩 검색 담당 (optional)
-            bedrock_retriever: AWS Bedrock KB 검색 담당 (optional)
+            local_retriever: 로컬 문서 검색기
+            s3_retriever: S3 기반 검색기
+            medgemma_searcher: MedGemma 검색기
+            pubmed_searcher: PubMed 검색기
+            tavily_searcher: Tavily 웹 검색기
+            bedrock_retriever: Bedrock KB 검색기
         """
-        self.retriever = retriever
-        self.medgemma_searcher = medgemma_searcher
-        self.tavily_searcher = tavily_searcher
-        self.s3_retriever = s3_retriever
-        self.bedrock_retriever = bedrock_retriever
-        
-        self.local_search_enabled = getattr(retriever, 'local_search_enabled', True)
+
+        self.retrievers = {
+            "local": local_retriever,
+            "s3": s3_retriever,
+            "medgemma": medgemma_searcher,
+            "pubmed": pubmed_searcher,
+            "tavily": tavily_searcher,
+            "bedrock_kb": bedrock_retriever
+        }
                     
         # 소스별 활성화 상태
         self.sources_enabled = {
-            "rag": retriever and retriever.local_search_enabled,
-            "medgemma": medgemma_searcher is not None,
-            "s3": s3_retriever is not None and s3_retriever.enabled,
-            "pubmed": retriever and hasattr(retriever, 'pubmed_searcher') and retriever.pubmed_searcher is not None,
-            "tavily" : tavily_searcher is not None,
-            "bedrock_kb": bedrock_retriever is not None and hasattr(bedrock_retriever, "retrieve_documents")
+            source: retriever is not None and Config.SEARCH_SOURCES_CONFIG.get(source, False)
+            for source, retriever in self.retrievers.items()
         }
 
         # 병렬 실행 설정
-        self.max_workers = 5
+        self.max_workers = 6
         self.timeout = 30  # 각 소스별 타임아웃 (초)
         
-        print("🚀 병렬 검색기 초기화 완료")
-    
+        # 활성화된 소스 로깅
+        active_sources = [source for source, enabled in self.sources_enabled.items() if enabled]
+        print(f"🚀 병렬 검색기 초기화 완료 (활성 소스: {', '.join(active_sources) if active_sources else '없음'})")
+
     def search_all_parallel(self, question: str) -> Dict[str, List[Document]]:
         """
         모든 소스에서 병렬 검색 실행
@@ -81,74 +89,92 @@ class ParallelSearcher:
     def _prepare_search_tasks(self, question: str) -> Dict[str, Dict]:
         """검색 작업 딕셔너리 준비"""
         tasks = {}
+        source_functions = {}
         
-        # 로컬 RAG 검색
-        if self.retriever is not None:
-            # 로컬 문서 검색 메서드 확인
-            if hasattr(self.retriever, '_retrieve_local_documents'):
-                print("  🔍 로컬 RAG 검색 추가")
-                tasks["rag"] = {
-                    "function": self.retriever._retrieve_local_documents,
+        # 로컬 검색기 작업 추가
+        if self.retrievers["local"] is not None:
+            try:
+                if hasattr(self.retrievers["local"], "_retrieve_local_documents"):
+                    func = self.retrievers["local"]._retrieve_local_documents
+                else:
+                    func = self.retrievers["local"].retrieve_documents
+                    
+                source_functions["local"] = {
+                    "function": func,
                     "args": [question],
                     "kwargs": {}
                 }
-            elif hasattr(self.retriever, 'retrieve_documents'):
-                print("  🔍 일반 retrieve_documents 메서드 사용")
-                tasks["rag"] = {
-                    "function": self.retriever.retrieve_documents,
+            except Exception as e:
+                print(f"  ⚠️ 로컬 검색기 설정 실패: {str(e)}")
+        
+        # S3 검색기 작업 추가
+        if self.retrievers["s3"] is not None:
+            try:
+                source_functions["s3"] = {
+                    "function": self.retrievers["s3"].retrieve_documents,
                     "args": [question],
                     "kwargs": {}
                 }
-            
-            # PubMed 검색
-            if hasattr(self.retriever, 'pubmed_searcher') and self.retriever.pubmed_searcher is not None:
-                if hasattr(self.retriever.pubmed_searcher, 'search_pubmed'):
-                    print("  🔍 PubMed 검색 추가")
-                    tasks["pubmed"] = {
-                        "function": self.retriever.pubmed_searcher.search_pubmed,
-                        "args": [question],
-                        "kwargs": {"max_results": 3}
-                    }
+            except Exception as e:
+                print(f"  ⚠️ S3 검색기 설정 실패: {str(e)}")
         
-        # MedGemma 검색
-        if self.medgemma_searcher is not None and hasattr(self.medgemma_searcher, 'search_medgemma'):
-            print("  🔍 MedGemma 검색 추가")
-            tasks["medgemma"] = {
-                "function": self.medgemma_searcher.search_medgemma,
-                "args": [question],
-                "kwargs": {"max_results": 1}
-            }
+        # MedGemma 검색기 작업 추가
+        if self.retrievers["medgemma"] is not None:
+            try:
+                source_functions["medgemma"] = {
+                    "function": self.retrievers["medgemma"].search_medgemma,
+                    "args": [question],
+                    "kwargs": {"max_results": 3}
+                }
+            except Exception as e:
+                print(f"  ⚠️ MedGemma 검색기 설정 실패: {str(e)}")
         
-        # Tavily 웹 검색
-        if self.tavily_searcher is not None and hasattr(self.tavily_searcher, 'search_web'):
-            print("  🔍 Tavily 웹 검색 추가")
-            tasks["web"] = {
-                "function": self.tavily_searcher.search_web,
-                "args": [question],
-                "kwargs": {"max_results": 3}
-            }
-
-        # S3 검색
-        if self.s3_retriever is not None and hasattr(self.s3_retriever, 'retrieve_documents'):
-            print("  🔍 S3 검색 추가")
-            tasks["s3"] = {
-                "function": self.s3_retriever.retrieve_documents,
-                "args": [question],
-                "kwargs": {"k": 5}
-            }
-
-        # Bedrock KB 검색
-        if self.bedrock_retriever is not None and hasattr(self.bedrock_retriever, 'retrieve_documents'):
-            print("  🔍 Bedrock KB 검색 추가")
-            tasks["bedrock_kb"] = {
-                "function": self.bedrock_retriever.retrieve_documents,
-                "args": [question],
-                "kwargs": {"top_k": 5}
-            }
+        # PubMed 검색기 작업 추가
+        if self.retrievers["pubmed"] is not None:
+            try:
+                source_functions["pubmed"] = {
+                    "function": self.retrievers["pubmed"].search_pubmed,
+                    "args": [question],
+                    "kwargs": {"max_results": 3}
+                }
+            except Exception as e:
+                print(f"  ⚠️ PubMed 검색기 설정 실패: {str(e)}")
         
-        print(f"  📋 총 {len(tasks)}개 검색 작업 준비됨")
+        # Tavily 검색기 작업 추가
+        if self.retrievers["tavily"] is not None:
+            try:
+                source_functions["tavily"] = {
+                    "function": self.retrievers["tavily"].search_web,
+                    "args": [question],
+                    "kwargs": {"max_results": 5}
+                }
+            except Exception as e:
+                print(f"  ⚠️ Tavily 검색기 설정 실패: {str(e)}")
+        
+        # Bedrock KB 검색기 작업 추가
+        if self.retrievers["bedrock_kb"] is not None:
+            try:
+                source_functions["bedrock_kb"] = {
+                    "function": self.retrievers["bedrock_kb"].retrieve_documents,
+                    "args": [question],
+                    "kwargs": {}
+                }
+            except Exception as e:
+                print(f"  ⚠️ Bedrock KB 검색기 설정 실패: {str(e)}")
+        
+        # 활성화된 소스만 작업에 추가
+        for source, enabled in self.sources_enabled.items():
+            if enabled and source in source_functions:
+                print(f"  🔍 {source.upper()} 검색 추가")
+                tasks[source] = source_functions[source]
+        
+        # 작업이 없는 경우 로깅
+        if not tasks:
+            print("  ⚠️ 활성화된 검색 소스가 없거나 모두 초기화 실패했습니다")
+        
         return tasks
         
+
     
     def _execute_parallel_search(self, search_tasks: Dict[str, Dict]) -> Dict[str, List[Document]]:
         """병렬 검색 실행"""
@@ -199,13 +225,31 @@ class ParallelSearcher:
             return
         
         # 소스별 특수 처리
-        if source == "rag" and self.retriever:
-            self.retriever.set_local_search_enabled(enabled)
-        elif source == "s3" and self.s3_retriever:
-            self.s3_retriever.set_enabled(enabled)
+        if source == "local" and self.retrievers.get("local"):
+            self.retrievers["local"].set_local_search_enabled(enabled)
+        elif source == "s3" and self.retrievers.get("s3"):
+            self.retrievers["s3"].set_enabled(enabled)
         
         # 상태 업데이트
         self.sources_enabled[source] = enabled
         
         status = "활성화" if enabled else "비활성화"
         print(f"🔧 검색 소스 '{source}' {status} 완료")
+
+    def get_stats(self) -> Dict[str, Any]:
+        """병렬 검색기 통계 반환"""
+        stats = {
+            "active_sources": [source for source, enabled in self.sources_enabled.items() if enabled],
+            "total_sources": len(self.retrievers),
+            "enabled_sources": sum(1 for enabled in self.sources_enabled.values() if enabled)
+        }
+        
+        # 각 검색기의 통계도 추가
+        for source, retriever in self.retrievers.items():
+            if retriever and hasattr(retriever, "get_stats"):
+                try:
+                    stats[f"{source}_stats"] = retriever.get_stats()
+                except:
+                    pass
+        
+        return stats    

@@ -5,27 +5,19 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
 from prompts import system_prompts
+from config import Config
 
 class Integrator:
     """다중 소스 정보 통합 담당 클래스 (가중치 적용)"""
     
     def __init__(self, llm: ChatOpenAI):
         self.llm = llm
+        self.source_weights = Config.SOURCE_WEIGHTS.copy()
         
-        # 소스별 신뢰도 가중치
-        self.source_weights = {
-            "pubmed": 1.0,     # 최고 신뢰도 (학술 논문)
-            "bedrock_kb": 0.9, # AWS Bedrock KB (높은 신뢰도)
-            "medgemma": 0.9,   # 높은 신뢰도 (의료 특화 AI)
-            "rag": 0.8,        # 높은 신뢰도 (큐레이션된 데이터)
-            "web": 0.6         # 중간 신뢰도 (웹 검색)
-        }
-
         self._setup_integration_chain()
     
     def _setup_integration_chain(self):
         """정보 통합 체인 설정"""
-        # 하드코딩된 프롬프트 대신 system_prompts 사용
         # 가중치 변수를 템플릿에 전달하여 동적 프롬프트 생성
         self.integration_prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompts.format("INTEGRATOR", 
@@ -105,15 +97,22 @@ class Integrator:
                 
             weight = self.source_weights.get(source_type, 0.5)
             
-            content_parts.append(f"\n=== {source_type.upper()} SOURCES (신뢰도: {weight}) ===")
+            # 소스 표시 이름 (사용자 친화적)
+            source_display_name = {
+                "local": "로컬 문서",
+                "s3": "S3 저장소",
+                "medgemma": "의료 AI",
+                "pubmed": "PubMed 논문",
+                "tavily": "웹 검색",
+                "bedrock_kb": "지식 베이스"
+            }.get(source_type, source_type.upper())
+            
+            content_parts.append(f"\n=== {source_display_name} (신뢰도: {weight}) ===")
             
             for i, doc in enumerate(docs):
-                # 소스 유형별 출처 정보 추출
-                source_info = self._extract_source_info(source_type, doc)
+                source = doc.metadata.get("source", "unknown")
                 content = doc.page_content[:300]  # 300자 제한
-                
-                # 출처 정보 포함
-                content_parts.append(f"{i+1}. [{source_info}] {content}")
+                content_parts.append(f"{i+1}. [{source}] {content}")
         
         return "\n".join(content_parts)
 

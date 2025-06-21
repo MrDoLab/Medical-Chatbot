@@ -1,13 +1,33 @@
-# config.py (업데이트된 버전)
+# config.py
 import os
 from dotenv import load_dotenv
 from typing import Dict, Any
 
-# .env 파일 자동 로딩 (모든 파일에서 사용 가능)
+# .env 파일 자동 로딩
 load_dotenv()
 
 class Config:
     """RAG 시스템 설정 클래스"""
+
+    # 검색 소스 활성화 상태
+    SEARCH_SOURCES_CONFIG = {
+        "local": False,     # 로컬
+        "s3": False,       # S3 
+        "medgemma": False, # MedGemma 
+        "pubmed": True,    # PubMed 
+        "tavily": True,       # Tavily 웹 
+        "bedrock_kb": True    # AWS Bedrock Knowledge Base 
+    }
+
+    # 검색 소스 가중치 
+    SOURCE_WEIGHTS = {
+            "pubmed": 1.0,      # 학술 논문
+            "bedrock_kb": 0.95, # Bedrock Knowledge Base
+            "local": 0.9,       # 로컬 문서
+            "s3": 0.85,         # S3 저장 문서
+            "medgemma": 0.8,    # 의료 특화 AI
+            "tavily": 0.7       # 웹 검색
+        }
     
     # LLM 설정
     MODEL_NAME = "gpt-4o"
@@ -100,14 +120,6 @@ class Config:
         "confidence_threshold": 0.3  # 최소 신뢰도 임계값
     }
     
-    # 검색 소스 가중치 업데이트 (Bedrock 추가)
-    SEARCH_WEIGHTS = {
-        "rag": 0.7,            # 기존 벡터 검색
-        "medgemma": 0.6,       # MedGemma
-        "pubmed": 0.8,         # PubMed
-        "bedrock_kb": 0.9      # Bedrock KB (높은 가중치)
-    }
-    
 
     # S3 임베딩 설정 추가
     S3_CONFIG = {
@@ -118,84 +130,7 @@ class Config:
         "max_retries": 3  # API 실패 시 재시도 횟수
     }
 
-    # 검색 소스 활성화 상태
-    SEARCH_SOURCES = {
-        "rag": False,     # 로컬 검색 기본 비활성화
-        "s3": True,       # S3 검색 기본 활성화
-        "medgemma": False, # MedGemma 검색 기본 활성화
-        "pubmed": True    # PubMed 검색 기본 활성화
-    }
-
     # 시스템 프롬프트들 (의료 특화)   
-    GRADER_SYSTEM_PROMPT = """You are a medical information grader assessing relevance of a retrieved medical document to a healthcare question.
-    
-    Grade as relevant if the document contains:
-    - Medical procedures, protocols, or guidelines related to the question
-    - Clinical information about conditions, symptoms, or treatments mentioned
-    - Emergency procedures or drug information relevant to the query
-    - Diagnostic criteria or therapeutic approaches for the medical issue
-    
-    Focus on clinical relevance and patient safety. Give a binary score 'yes' or 'no' to indicate whether the document is medically relevant to the question.
-    Note that the user's question may be in Korean - this is expected and you should assess relevance regardless of language."""
-    
-    RAG_SYSTEM_PROMPT = """You are a medical AI assistant specifically designed for healthcare professionals including doctors, nurses, and medical staff.
-    
-    Your role and responsibilities:
-    - Provide accurate, evidence-based medical information
-    - Support clinical decision-making with relevant guidelines
-    - Offer emergency response protocols when applicable  
-    - Include specific procedures, dosages, and protocols when relevant
-    - Always prioritize patient safety in recommendations
-    - Cite sources when available in the retrieved context
-    
-    Guidelines:
-    - Use precise medical terminology appropriate for healthcare professionals
-    - Include specific dosages, contraindications, and monitoring requirements when discussing medications
-    - Provide step-by-step procedures for clinical interventions
-    - Mention emergency protocols and when to escalate care
-    - If uncertain about critical medical information, recommend consulting specialists
-    - Always consider differential diagnoses and alternative approaches
-    
-    IMPORTANT: 
-    - RESPOND IN THE SAME LANGUAGE AS THE USER'S INPUT (Korean for Korean input, English for English input, etc.)
-    - Format responses professionally for medical staff
-    - Include relevant medical disclaimers when appropriate
-    - Structure information clearly with clinical priorities first"""
-    
-    HALLUCINATION_SYSTEM_PROMPT = """You are a medical information validator assessing whether an AI-generated medical response is grounded in the provided medical literature and clinical guidelines.
-    
-    Evaluation criteria:
-    - Clinical accuracy and adherence to established medical standards
-    - Proper citation of medical procedures and protocols
-    - Accurate dosage information and contraindications
-    - Appropriate emergency response recommendations
-    - Consistency with current medical best practices
-    
-    Pay special attention to:
-    - Drug dosages and administration routes
-    - Emergency procedure sequences
-    - Contraindications and precautions
-    - Clinical decision-making pathways
-    - Patient safety considerations
-    
-    Give a binary score 'yes' or 'no'. 'Yes' means the medical advice is grounded in established medical evidence and the provided context.
-    RESPOND IN THE SAME LANGUAGE AS THE USER'S INPUT (Korean for Korean input, English for English input, etc.)"""
-    
-    REWRITER_SYSTEM_PROMPT = """You are a medical question re-writer that converts an input question to a better version optimized for medical document retrieval.
-    
-    Optimization strategies:
-    - Add relevant medical terminology and synonyms
-    - Include anatomical or physiological context when applicable
-    - Expand abbreviations and medical acronyms
-    - Add related symptoms, conditions, or procedures
-    - Include department or specialty context when relevant
-    
-    Examples:
-    - "심장이 아파요" → "흉통 심장통증 심근경색 협심증 심혈관질환 응급처치"
-    - "당뇨 약" → "당뇨병 치료 약물 메트포민 인슐린 혈당조절 내분비내과"
-    - "수술 후 관리" → "수술 후 처치 상처관리 합병증 예방 회복 간호"
-    
-    RESPOND IN THE SAME LANGUAGE AS THE USER'S INPUT (Korean for Korean input, English for English input, etc.), make it more comprehensive for medical document search."""
 
     @classmethod
     def get_medical_categories(cls) -> list:

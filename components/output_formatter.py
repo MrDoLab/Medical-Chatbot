@@ -82,13 +82,14 @@ class OutputFormatter:
             
             if breakdown.get("pubmed", 0) > 0:
                 source_details.append(f"PubMed 논문 {breakdown['pubmed']}개")
-            if breakdown.get("rag", 0) > 0:
-                source_details.append(f"내부 DB {breakdown['rag']}개")
-            if breakdown.get("web", 0) > 0:
-                source_details.append(f"웹 자료 {breakdown['web']}개")
-            
-            if source_details:
-                formatted_parts.append(f"• {', '.join(source_details)}")
+            if breakdown.get("local", 0) > 0:  # RAG → LOCAL 변경
+                source_details.append(f"내부 DB {breakdown['local']}개")
+            if breakdown.get("s3", 0) > 0:
+                source_details.append(f"S3 문서 {breakdown['s3']}개")
+            if breakdown.get("bedrock_kb", 0) > 0:
+                source_details.append(f"지식 베이스 {breakdown['bedrock_kb']}개")
+            if breakdown.get("tavily", 0) > 0:
+                source_details.append(f"웹 자료 {breakdown['tavily']}개")
         
         # 품질 검증 정보
         if hallucination_attempts > 1:

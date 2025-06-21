@@ -1,4 +1,4 @@
-# rag_system.py (리팩토링된 버전)
+# rag_system.py
 from typing import Literal, List, Dict, Any, Optional, Annotated
 from pydantic import BaseModel
 from langchain_openai import ChatOpenAI
@@ -10,14 +10,16 @@ import os
 from datetime import datetime
     
 from config import Config
-from components.retriever import Retriever
+from components.local_retriever import LocalRetriever
+from components.pubMed_searcher import PubMedSearcher
 from components.evaluator import Evaluator
 from components.generator import Generator
 from components.integrator import Integrator
 from components.output_formatter import OutputFormatter
 from components.memory_manager import MemoryManager
-from components.parallel_searcher import ParallelSearcher
 from components.bedrock_retriever import BedrockRetriever
+
+from components.parallel_searcher import ParallelSearcher
 
 
 def use_last_value(current_val, new_val):
@@ -61,38 +63,50 @@ class RAGSystem:
         self.config = Config()
         self.llm = ChatOpenAI(model=self.config.MODEL_NAME, temperature=self.config.TEMPERATURE)
 
-        # 핵심 컴포넌트 초기화
-        self.retriever = Retriever()
+        # 기본 컴포넌트 초기화
         self.evaluator = Evaluator(self.llm)
         self.generator = Generator(self.llm)
         self.integrator = Integrator(self.llm)
         self.output_formatter = OutputFormatter()
         self.memory_manager = MemoryManager(self.llm)
 
-        from components.medgemma_searcher import MedGemmaSearcher
-        self.medgemma_searcher = None
-        self.parallel_searcher = ParallelSearcher(self.retriever, self.medgemma_searcher)
+        # 로컬 검색기 초기화
+        self.local_retriever = None
+        if self.config.SEARCH_SOURCES_CONFIG.get("local", False):
+            self.local_retriever = LocalRetriever(pubmed_searcher=self.pubmed_searcher)
+            self.local_retriever.set_local_search_enabled(True)
+            print("✅ 로컬 검색기 초기화 완료")
 
-        # Tavily 검색기 초기화
-        from components.tavily_searcher import TavilySearcher
-        self.tavily_searcher = None
-        try:
-            self.tavily_searcher = TavilySearcher()
-            print("✅ Tavily 웹 검색 준비 완료")
-        except Exception as e:
-            print(f"⚠️ Tavily 웹 검색 초기화 실패: {str(e)}")
+        # PubMed 검색기 초기화
+        self.pubmed_searcher = None
+        if self.config.SEARCH_SOURCES_CONFIG.get("pubmed", False):
+            self.pubmed_searcher = PubMedSearcher()
+            print("✅ PubMed 검색기 초기화 완료")
         
-        # S3 리트리버 초기화
-        from components.s3_retriever import S3Retriever
+        # S3 검색기 초기화
         self.s3_retriever = None
-        """
-        S3Retriever(
+        if self.config.SEARCH_SOURCES_CONFIG.get("s3", False):
+            from components.s3_retriever import S3Retriever
+            self.s3_retriever = S3Retriever(
             bucket_name="aws-medical-chatbot",
             search_function="medical-embedding-search",
-            region_name="us-east-2",  # 리전 파라미터 추가
-            enabled=True  # S3 검색 기본 활성화
-        )
-        """
+            region_name="us-east-2" 
+            )
+            print("✅ S3 검색기 초기화 완료")
+        
+        # MedGemma 초기화
+        self.medgemma_searcher = None
+        if self.config.SEARCH_SOURCES_CONFIG.get("medgemma", False):
+            from components.medgemma_searcher import MedGemmaSearcher
+            self.medgemma_searcher = MedGemmaSearcher()
+            print("✅ MedGemma 검색기 초기화 완료")
+        
+        # Tavily 초기화
+        self.tavily_searcher = None
+        if self.config.SEARCH_SOURCES_CONFIG.get("tavily", False):
+            from components.tavily_searcher import TavilySearcher
+            self.tavily_searcher = TavilySearcher()
+            print("✅ Tavily 웹 검색 초기화 완료")
 
         # Bedrock Retriever 추가
         bedrock_kb_id = None
@@ -118,19 +132,19 @@ class RAGSystem:
                     print("ℹ️ Bedrock KB ID가 설정되지 않았습니다")
         except Exception as e:
             print(f"⚠️ Bedrock 설정 확인 실패: {str(e)}")
-        
-        # 클래스에 할당
+
         self.bedrock_retriever = bedrock_retriever
 
         # 병렬 검색기 초기화
         self.parallel_searcher = ParallelSearcher(
-            self.retriever, 
-            self.medgemma_searcher,
-            self.tavily_searcher,
-            self.s3_retriever,
-            self.bedrock_retriever
-        )
-    
+        local_retriever=self.local_retriever,
+        s3_retriever=self.s3_retriever,
+        medgemma_searcher=self.medgemma_searcher,
+        pubmed_searcher=self.pubmed_searcher,
+        tavily_searcher=self.tavily_searcher,
+        bedrock_retriever=self.bedrock_retriever
+    )
+        
         # 워크플로우 설정
         self.workflow = None
         self.app = None
@@ -141,23 +155,19 @@ class RAGSystem:
         """간소화된 워크플로우 그래프 구성"""
         self.workflow = StateGraph(GraphState)
         
-        # 핵심 노드만 설정 (7개)
+        # 핵심 노드만 설정 
         self.workflow.add_node("process_question", self._process_question)
-        self.workflow.add_node("retrieve", self._retrieve)
         self.workflow.add_node("parallel_search", self._parallel_search)
         self.workflow.add_node("integrate_answers", self._integrate_answers)
         self.workflow.add_node("hallucination_check", self._hallucination_check)
         self.workflow.add_node("format_output", self._format_output)
 
-        # 간소화된 엣지 설정
+        # 엣지 설정
         self.workflow.set_entry_point("process_question")
-        
-        self.workflow.add_edge("process_question", "retrieve")
-        
-        self.workflow.add_edge("retrieve", "parallel_search")
+        self.workflow.add_edge("process_question", "parallel_search")
         self.workflow.add_edge("parallel_search", "integrate_answers")
         self.workflow.add_edge("integrate_answers", "hallucination_check")
-        
+
         self.workflow.add_conditional_edges(
             "hallucination_check",
             self._get_hallucination_decision,
@@ -169,7 +179,7 @@ class RAGSystem:
         # 그래프 컴파일
         self.app = self.workflow.compile(checkpointer=self.checkpointer)
     
-    # 노드 함수들 (간소화된 버전)
+    # 노드 함수들
     def _process_question(self, state: GraphState) -> Dict[str, Any]:
         """사용자 질문 처리 및 맥락 기반 질문 재생성"""
         print("==== [PROCESS QUESTION] ====")
@@ -177,7 +187,7 @@ class RAGSystem:
         original_question = state.question
         current_history = state.conversation_history or []
 
-        # 1단계: 메모리 관리 (요약 등)
+        # 1단계: 메모리 관리
         managed_history = self.memory_manager.manage_conversation_memory(current_history)
         
         # 2단계: 맥락 기반 질문 재생성 (이전 대화가 있으면 무조건 실행)
@@ -185,7 +195,7 @@ class RAGSystem:
             managed_history, original_question
         )
         
-        # 3단계: 대화 이력에 원래 질문 추가 (사용자가 실제로 한 질문)
+        # 3단계: 대화 이력에 원래 질문 추가
         managed_history.append({
             "role": "user",
             "content": original_question,
@@ -202,7 +212,7 @@ class RAGSystem:
     def _retrieve(self, state: GraphState) -> Dict[str, Any]:
         """벡터 검색 (유사도 임계값 적용)"""
         print("==== [VECTOR RETRIEVE] ====")
-        documents = self.retriever.retrieve_documents(state.question)
+        documents = self.local_retriever.retrieve_documents(state.question)
         
         # 유사도 임계값 적용
         threshold = getattr(self.config, 'SIMILARITY_THRESHOLD', 0.7)
@@ -399,7 +409,6 @@ class RAGSystem:
         """시스템 상태 및 통계 조회"""
         status = {
             "search_sources": self.parallel_searcher.sources_enabled,
-            "retriever_stats": self.retriever.get_stats(),
             "s3_stats": self.s3_retriever.get_stats() if self.s3_retriever else None,
             "medgemma_stats": self.medgemma_searcher.get_stats() if self.medgemma_searcher else None,
         }

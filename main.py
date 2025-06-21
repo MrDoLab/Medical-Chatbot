@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 from rag_system import RAGSystem
 from pathlib import Path
+import traceback
 
 load_dotenv()
 
@@ -13,16 +14,6 @@ def main():
         print("🔄 시스템 초기화 중...")
         rag_system = RAGSystem()
         print("✅ RAG 시스템 준비 완료!")
-        
-        # 검색 소스 설정 (S3만 활성화, 나머지 비활성화)
-        source_config = {
-            "rag": False,     # 로컬 검색 비활성화
-            "s3": True,       # S3 검색 활성화
-            "medgemma": True, # MedGemma 활성화
-            "pubmed": True    # PubMed 활성화
-        }
-        
-        rag_system.configure_search_sources(source_config)
         
         # 시스템 상태 확인
         status = rag_system.get_system_status()
@@ -101,7 +92,8 @@ def main():
         print("\n👋 사용자가 종료했습니다.")
     except Exception as e:
         print(f"❌ 에러 발생: {e}")
-        print("💡 OPENAI_API_KEY가 설정되었는지 확인하세요")
+        print("상세 에러 정보:")
+        traceback.print_exc()
 
 if __name__ == "__main__":
     main()
