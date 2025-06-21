@@ -45,7 +45,7 @@ class SystemPrompts:
     
     def _initialize_prompts(self):
         """기본 프롬프트 초기화"""
-        
+
         # 평가자 프롬프트
         self._prompts["GRADER"] = PromptTemplate(
             content="""You are a medical information grader assessing relevance of a retrieved medical document to a healthcare question.
@@ -90,6 +90,7 @@ class SystemPrompts:
             version="1.0",
             description="의료 전문가용 RAG 응답 생성"
         )
+        
         
         # 환각 평가 프롬프트
         self._prompts["HALLUCINATION"] = PromptTemplate(
