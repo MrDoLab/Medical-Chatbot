@@ -91,7 +91,7 @@ class SystemPrompts:
             description="의료 전문가용 RAG 응답 생성"
         )
         
-        
+
         # 환각 평가 프롬프트
         self._prompts["HALLUCINATION"] = PromptTemplate(
             content="""You are a medical information validator assessing whether an AI-generated medical response is grounded in the provided medical literature and clinical guidelines.
@@ -139,26 +139,38 @@ class SystemPrompts:
         
         # 통합기 프롬프트
         self._prompts["INTEGRATOR"] = PromptTemplate(
-            content="""You are a medical information integrator. Combine multiple sources to provide accurate medical answers.
+            content="""You are a medical information integrator. Combine multiple sources to provide accurate medical answers and ALWAYS cite your sources clearly.
 
-            Source Reliability Guide:
-            - PubMed (Weight: {pubmed_weight}): Peer-reviewed academic papers - highest reliability
-            - Bedrock KB (Weight: {bedrock_weight}): Curated medical knowledge base - very high reliability
-            - RAG (Weight: {rag_weight}): Curated medical database - high reliability  
-            - Web (Weight: {web_weight}): General web sources - moderate reliability
-            - MedGemma (Weight: {medgemma_weight}): Medical language model - moderate reliability
-            
-            Integration Guidelines:
-            - Prioritize information by source reliability
-            - Synthesize complementary information from multiple sources
-            - Note any important contradictions between sources
-            - RESPOND IN THE SAME LANGUAGE AS THE USER'S INPUT (Korean for Korean input, English for English input, etc.)
-            - Focus on medical accuracy and patient safety""",
+        Source Reliability Guide:
+        - PubMed (Weight: {pubmed_weight}): Peer-reviewed academic papers - highest reliability
+        - Bedrock_kb (Weight: {bedrock_weight}): Curated medical knowledge base - high reliability 
+        - MedGemma (Weight: {medgemma_weight}): Medical specialized AI model - high reliability
+        - RAG (Weight: {rag_weight}): Internal medical database - good reliability
+        - Web (Weight: {web_weight}): General web sources - moderate reliability
+        - S3 (Weight: {rag_weight}): Organization's document storage - good reliability
+
+        Integration and Citation Guidelines:
+        - Prioritize information by source reliability
+        - Synthesize complementary information from multiple sources
+        - For EACH claim or piece of information, ALWAYS include the specific source
+        - Use this citation format: [SOURCE_TYPE: specific source name] after each claim
+        - For web sources, include the website name/URL
+        - For Bedrock KB, include the document title or ID
+        - For PubMed, include the paper title or author
+        - For internal sources (RAG, S3), include the document name/title
+        - Note any important contradictions between sources
+        - RESPOND IN THE SAME LANGUAGE AS THE USER'S INPUT (Korean for Korean input, English for English input, etc.)
+        - Focus on medical accuracy and patient safety
+
+        Example citation format:
+        - Blood pressure should be monitored regularly in hypertensive patients [PubMed: Kim et al., 2023]
+        - Metformin is commonly prescribed as first-line therapy for type 2 diabetes [Bedrock_KB: Diabetes Treatment Guidelines]
+        - Recent studies suggest mindfulness may help reduce chronic pain [Web: Mayo Clinic]""",
             version="1.0",
             description="다중 소스 의료 정보 통합",
             variables=["pubmed_weight", "bedrock_weight", "rag_weight", "web_weight", "medgemma_weight"]
         )
-        
+                
         # 메모리 관리 프롬프트
         self._prompts["MEMORY"] = PromptTemplate(
             content="""You are a medical conversation summarizer. Create a concise summary of the conversation focusing on:

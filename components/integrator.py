@@ -4,13 +4,13 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
+from prompts import system_prompts
 
 class Integrator:
     """다중 소스 정보 통합 담당 클래스 (가중치 적용)"""
     
     def __init__(self, llm: ChatOpenAI):
         self.llm = llm
-        self._setup_integration_chain()
         
         # 소스별 신뢰도 가중치
         self.source_weights = {
@@ -20,38 +20,21 @@ class Integrator:
             "rag": 0.8,        # 높은 신뢰도 (큐레이션된 데이터)
             "web": 0.6         # 중간 신뢰도 (웹 검색)
         }
+
+        self._setup_integration_chain()
     
     def _setup_integration_chain(self):
         """정보 통합 체인 설정"""
+        # 하드코딩된 프롬프트 대신 system_prompts 사용
+        # 가중치 변수를 템플릿에 전달하여 동적 프롬프트 생성
         self.integration_prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a medical information integrator. Combine multiple sources to provide accurate medical answers and ALWAYS cite your sources clearly.
-
-        Source Reliability Guide:
-        - PubMed (Weight: 1.0): Peer-reviewed academic papers - highest reliability
-        - Bedrock_kb (Weight: 0.9): Curated medical knowledge base - high reliability 
-        - MedGemma (Weight: 0.9): Medical specialized AI model - high reliability
-        - RAG (Weight: 0.8): Internal medical database - good reliability
-        - Web (Weight: 0.6): General web sources - moderate reliability
-        - S3 (Weight: 0.8): Organization's document storage - good reliability
-
-        Integration and Citation Guidelines:
-        - Prioritize information by source reliability
-        - Synthesize complementary information from multiple sources
-        - For EACH claim or piece of information, ALWAYS include the specific source
-        - Use this citation format: [SOURCE_TYPE: specific source name] after each claim
-        - For web sources, include the website name/URL
-        - For Bedrock KB, include the document title or ID
-        - For PubMed, include the paper title or author
-        - For internal sources (RAG, S3), include the document name/title
-        - Note any important contradictions between sources
-        - RESPOND IN THE SAME LANGUAGE AS THE USER'S INPUT (Korean for Korean input, English for English input, etc.)
-        - Focus on medical accuracy and patient safety
-
-        Example citation format:
-        - Blood pressure should be monitored regularly in hypertensive patients [PubMed: Kim et al., 2023]
-        - Metformin is commonly prescribed as first-line therapy for type 2 diabetes [Bedrock_KB: Diabetes Treatment Guidelines]
-        - Recent studies suggest mindfulness may help reduce chronic pain [Web: Mayo Clinic]
-        """),
+            ("system", system_prompts.format("INTEGRATOR", 
+                pubmed_weight=self.source_weights.get("pubmed", 1.0),
+                bedrock_weight=self.source_weights.get("bedrock_kb", 0.9),
+                rag_weight=self.source_weights.get("rag", 0.8),
+                web_weight=self.source_weights.get("web", 0.6),
+                medgemma_weight=self.source_weights.get("medgemma", 0.9)
+            )),
             ("human", """Question: {question}
 
         Sources with weights:

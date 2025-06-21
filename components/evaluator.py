@@ -3,7 +3,8 @@ from pydantic import BaseModel, Field
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
-from config import Config
+from prompts import system_prompts
+
 
 class GradeDocuments(BaseModel):
     """Binary score for relevance check on retrieved documents."""
@@ -29,7 +30,7 @@ class Evaluator:
         # 문서 관련성 평가기
         self.structured_llm_grader = self.llm.with_structured_output(GradeDocuments, method="function_calling")
         self.grade_prompt = ChatPromptTemplate.from_messages([
-            ("system", Config.GRADER_SYSTEM_PROMPT),
+            ("system", system_prompts.get("GRADER")),
             ("human", "Retrieved document: \n\n {document} \n\n User question: {question}"),
         ])
         self.retrieval_grader = self.grade_prompt | self.structured_llm_grader
@@ -37,7 +38,7 @@ class Evaluator:
         # 할루시네이션 평가기
         self.hallucination_grader_llm = self.llm.with_structured_output(GradeHallucinations, method="function_calling")
         self.hallucination_prompt = ChatPromptTemplate.from_messages([
-            ("system", Config.HALLUCINATION_SYSTEM_PROMPT),
+            ("system", system_prompts.get("HALLUCINATION")),
             ("human", "Set of facts: \n\n {documents} \n\n LLM generation: {generation}"),
         ])
         self.hallucination_grader = self.hallucination_prompt | self.hallucination_grader_llm

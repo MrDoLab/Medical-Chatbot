@@ -126,25 +126,7 @@ class Config:
         "pubmed": True    # PubMed 검색 기본 활성화
     }
 
-    # 시스템 프롬프트들 (의료 특화)
-    ROUTER_SYSTEM_PROMPT = """You are an expert at routing a medical question to a vectorstore or web search. 
-    The vectorstore contains medical documents, clinical guidelines, emergency protocols, and treatment procedures. 
-    
-    Use the vectorstore for:
-    - Medical procedures and protocols
-    - Clinical guidelines and best practices  
-    - Emergency response procedures
-    - Drug information and interactions
-    - Diagnostic criteria and methods
-    
-    Use web-search for:
-    - Recent medical news and updates
-    - Latest drug approvals or recalls
-    - Current epidemic or health alerts
-    - Real-time medical statistics
-    
-    Note that the user's question may be in Korean - this should not affect your routing decision."""
-    
+    # 시스템 프롬프트들 (의료 특화)   
     GRADER_SYSTEM_PROMPT = """You are a medical information grader assessing relevance of a retrieved medical document to a healthcare question.
     
     Grade as relevant if the document contains:
@@ -285,15 +267,16 @@ class Config:
             return False
 
     @classmethod
-    def get_system_prompts(cls) -> Dict[str, str]:
+    def get_system_prompt(cls, prompt_name: str, **kwargs):
         """
-        모든 시스템 프롬프트 조회
+        prompts.py의 시스템 프롬프트를 가져옵니다.
         
+        Args:
+            prompt_name: 프롬프트 이름 (예: 'RAG', 'GRADER')
+            kwargs: 템플릿 변수
+            
         Returns:
-            프롬프트 타입과 내용 딕셔너리
+            프롬프트 내용
         """
-        prompt_dict = {}
-        for attr_name in dir(cls):
-            if attr_name.endswith('_SYSTEM_PROMPT') and isinstance(getattr(cls, attr_name), str):
-                prompt_dict[attr_name] = getattr(cls, attr_name)
-        return prompt_dict
+        from prompts import system_prompts
+        return system_prompts.format(prompt_name, **kwargs) if kwargs else system_prompts.get(prompt_name)

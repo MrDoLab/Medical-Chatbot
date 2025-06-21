@@ -3,7 +3,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
-from config import Config
+from prompts import system_prompts
 
 class Generator:
     """답변 생성 담당 클래스"""
@@ -16,14 +16,14 @@ class Generator:
         """생성 체인 설정"""
         # RAG 답변 생성 체인
         self.rag_prompt = ChatPromptTemplate.from_messages([
-            ("system", Config.RAG_SYSTEM_PROMPT),
+            ("system", system_prompts.get("RAG")),
             ("human", """Question: {question} \n\nContext: {context} \n\nAnswer:"""),
         ])
         self.rag_chain = self.rag_prompt | self.llm | StrOutputParser()
         
         # 질문 재작성 체인
         self.re_write_prompt = ChatPromptTemplate.from_messages([
-            ("system", Config.REWRITER_SYSTEM_PROMPT),
+            ("system", system_prompts.get("REWRITER")),
             ("human", "Here is the initial question: \n\n {question} \n Formulate an improved question."),
         ])
         self.question_rewriter = self.re_write_prompt | self.llm | StrOutputParser()

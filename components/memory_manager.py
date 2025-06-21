@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from prompts import system_prompts
 
 class MemoryManager:
     """효율적인 대화 메모리 관리자"""
@@ -17,14 +18,7 @@ class MemoryManager:
     def _setup_summary_chain(self):
         """대화 요약 체인 설정"""
         self.summary_prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a medical conversation summarizer. Create a concise summary of the conversation focusing on:
-
-            1. Main medical topics discussed
-            2. Key symptoms or conditions mentioned
-            3. Important medical advice given
-            4. Ongoing concerns or follow-up topics
-            
-            Keep the summary under 200 words and respond in Korean."""),
+            ("system", system_prompts.format("MEMORY", language="한국어")),
             
             ("human", """Summarize this medical conversation:
             
