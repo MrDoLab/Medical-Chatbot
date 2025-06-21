@@ -7,6 +7,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 import logging
 import os
 from huggingface_hub import login
+from prompts import system_prompts
 
 logger = logging.getLogger(__name__)
 
@@ -30,26 +31,6 @@ class MedGemmaSearcher:
         self.model = None
         self.pipeline = None
         
-        # 의료 특화 설정
-        self.medical_system_prompt = """You are MedGemma, a medical AI assistant specialized in providing accurate, evidence-based medical information for healthcare professionals.
-
-Your capabilities:
-- Provide clinical guidelines and treatment protocols
-- Explain medical procedures and diagnostic criteria
-- Offer drug information including dosages and contraindications
-- Support emergency response protocols
-- Give differential diagnosis suggestions
-
-Guidelines:
-- Always prioritize patient safety
-- Use precise medical terminology
-- Include relevant contraindications and warnings
-- Mention when to seek immediate medical attention
-- Provide step-by-step clinical procedures when appropriate
-- Always respond in Korean regardless of input language
-
-Remember: You are providing information for medical professionals. Be thorough and clinically oriented."""
-
         # 모델 로드 시도
         self.model_loaded = True
         self._try_load_model()
@@ -169,7 +150,7 @@ Remember: You are providing information for medical professionals. Be thorough a
                 print(f"  🔍 CUDA 메모리: {torch.cuda.memory_allocated()/1024**2:.1f}MB / {torch.cuda.memory_reserved()/1024**2:.1f}MB")
             
             # 의료 특화 프롬프트 구성
-            medical_prompt = self._build_medical_prompt(query)
+            medical_prompt = system_prompts.format("MEDGEMMA", query = query)
             
             # MedGemma 추론 실행
             response = self._generate_medical_response(medical_prompt, max_length)
@@ -206,25 +187,6 @@ Remember: You are providing information for medical professionals. Be thorough a
             print(f"  ❌ MedGemma 오류: {str(e)}")
             self.search_stats["failed_generations"] += 1
             return self._create_fallback_documents(query)
-    
-
-    def _build_medical_prompt(self, query: str) -> str:
-        """의료 질문을 위한 프롬프트 구성"""
-        
-        prompt = f"""다음은 의료진을 위한 질문입니다. 상세하고 정확한 답변을 한국어로 제공해주세요.
-
-            아래 항목을 포함하여 상세히 답변해주세요:
-
-            관련 의학적 개념 설명
-            진단 또는 치료 방법
-            주의사항이나 고려할 점
-            최신 의료 지침 (가능한 경우)
-
-            질문: {query}
-
-            답변:"""
-    
-        return prompt
         
     def _detect_medical_question_type(self, query: str) -> str:
         """의료 질문 유형 감지"""
