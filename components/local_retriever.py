@@ -1,7 +1,6 @@
-# components/retriever.py (완전한 리팩토링된 버전)
+# components/local_retriever.py 
 """
-문서 검색 전용 클래스 - 임베딩 생성 및 유사도 검색에 집중
-문서 로딩은 DocumentLoader에게 위임
+로컬 문서 검색 전용 클래스
 """
 
 import os
@@ -14,14 +13,13 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 from datetime import datetime, timedelta
 from langchain_core.documents import Document
-from components.parallel_searcher import ParallelSearcher
 from components.document_loader import DocumentLoader
 from config import Config
 import logging
 
 logger = logging.getLogger(__name__)
 
-class Retriever:
+class LocalRetriever:
     """리팩토링된 검색 전용 클래스"""
     
     def __init__(self):
@@ -50,7 +48,6 @@ class Retriever:
         
         # 검색 활성화 여부
         self.local_search_enabled = False
-        self.s3_search_enabled = True
 
         # 검색 통계
         self.search_stats = {
@@ -61,19 +58,10 @@ class Retriever:
             "average_response_time": 0.0
         }
         
-        from components.pubMed_searcher import PubMedSearcher
-        self.pubmed_searcher = PubMedSearcher(
-            email="medical.chatbot@example.com",
-            api_key=None
-        )
-        
         # 캐시 파일 경로
         self.embeddings_file = Path("./embeddings_cache.pkl")
         self.documents_file = Path("./documents_cache.pkl")
 
-        # S3 리트리버 (기본값은 None, 외부에서 설정)
-        self.s3_retriever = None
-        
         print("🔍 검색기 초기화 중...")
         if self.local_search_enabled:
             self._load_cached_embeddings()
@@ -89,18 +77,6 @@ class Retriever:
         print(f"==== [SEARCH: {question[:50]}...] ====")
         
         documents = []
-        
-        # 1. S3 검색 (활성화된 경우)
-        if self.s3_retriever and self.s3_retriever.enabled:
-            try:
-                s3_docs = self.s3_retriever.retrieve_documents(question, k)
-                documents.extend(s3_docs)
-                print(f"  📊 S3 검색 결과: {len(s3_docs)}개 문서")
-            except Exception as e:
-                logger.error(f"S3 검색 실패: {str(e)}")
-                print(f"  ❌ S3 검색 오류: {str(e)}")
-        
-        # 2. 로컬 검색 (활성화된 경우)
         if self.local_search_enabled and (len(documents) < k):
             try:
                 local_docs = self._retrieve_local_documents(question, k - len(documents))
@@ -110,7 +86,7 @@ class Retriever:
                 logger.error(f"로컬 검색 실패: {str(e)}")
                 print(f"  ❌ 로컬 검색 오류: {str(e)}")
         
-        # 3. 폴백: 검색 결과가 없으면 기본 문서 제공
+        # 폴백: 검색 결과가 없으면 기본 문서 제공
         if not documents:
             documents = self._get_emergency_fallback_docs(question)
             print("  ⚠️ 검색 결과 없음: 폴백 문서 사용")
@@ -636,7 +612,7 @@ def test_refactored_retriever():
     
     try:
         # 1. 검색기 초기화
-        retriever = Retriever()
+        retriever = LocalRetriever()
         
         # 2. 문서 로딩 테스트
         if Path("./medical_docs").exists():
