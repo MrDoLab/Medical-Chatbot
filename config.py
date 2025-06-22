@@ -180,38 +180,38 @@ class Config:
             "max_retries": cls.MAX_REWRITE_COUNT
         }
     
-@classmethod
-def update_system_prompt(cls, prompt_type: str, new_content: str) -> bool:
-    """시스템 프롬프트 업데이트"""
-    try:
-        if hasattr(cls, prompt_type):
-            setattr(cls, prompt_type, new_content)
-            
-            # prompts.py의 SystemPrompts도 업데이트
-            try:
-                from prompts import SystemPrompts
-                system_prompts = SystemPrompts()
+    @classmethod
+    def update_system_prompt(cls, prompt_type: str, new_content: str) -> bool:
+        """시스템 프롬프트 업데이트"""
+        try:
+            if hasattr(cls, prompt_type):
+                setattr(cls, prompt_type, new_content)
                 
-                # 프롬프트 이름 변환 (Config 형식 -> prompts.py 형식)
-                prompt_map = {
-                    "RAG_SYSTEM_PROMPT": "RAG",
-                    "ROUTER_SYSTEM_PROMPT": "ROUTER",
-                    "GRADER_SYSTEM_PROMPT": "GRADER",
-                    "HALLUCINATION_SYSTEM_PROMPT": "HALLUCINATION",
-                    "REWRITER_SYSTEM_PROMPT": "REWRITER"
-                }
+                # prompts.py의 SystemPrompts도 업데이트
+                try:
+                    from prompts import SystemPrompts
+                    system_prompts = SystemPrompts()
+                    
+                    # 프롬프트 이름 변환 (Config 형식 -> prompts.py 형식)
+                    prompt_map = {
+                        "RAG_SYSTEM_PROMPT": "RAG",
+                        "ROUTER_SYSTEM_PROMPT": "ROUTER",
+                        "GRADER_SYSTEM_PROMPT": "GRADER",
+                        "HALLUCINATION_SYSTEM_PROMPT": "HALLUCINATION",
+                        "REWRITER_SYSTEM_PROMPT": "REWRITER"
+                    }
+                    
+                    if prompt_type in prompt_map:
+                        mapped_name = prompt_map[prompt_type]
+                        system_prompts.update(mapped_name, new_content)
+                except Exception as e:
+                    print(f"SystemPrompts 업데이트 실패: {e}")
                 
-                if prompt_type in prompt_map:
-                    mapped_name = prompt_map[prompt_type]
-                    system_prompts.update(mapped_name, new_content)
-            except Exception as e:
-                print(f"SystemPrompts 업데이트 실패: {e}")
-            
-            return True
-        return False
-    except Exception as e:
-        print(f"프롬프트 업데이트 실패: {e}")
-        return False
+                return True
+            return False
+        except Exception as e:
+            print(f"프롬프트 업데이트 실패: {e}")
+            return False
 
     @classmethod
     def get_system_prompt(cls, prompt_name: str, **kwargs):
