@@ -18,6 +18,7 @@ from components.integrator import Integrator
 from components.output_formatter import OutputFormatter
 from components.memory_manager import MemoryManager
 from components.bedrock_retriever import BedrockRetriever
+from components.medgemma_searcher import MedGemmaSearcher
 
 from components.parallel_searcher import ParallelSearcher
 
@@ -97,7 +98,6 @@ class RAGSystem:
         # MedGemma 초기화
         self.medgemma_searcher = None
         if self.config.SEARCH_SOURCES_CONFIG.get("medgemma", False):
-            from components.medgemma_searcher import MedGemmaSearcher
             self.medgemma_searcher = MedGemmaSearcher()
             print("✅ MedGemma 검색기 초기화 완료")
         
@@ -414,3 +414,31 @@ class RAGSystem:
         }
         
         return status
+
+    def refresh_components(self):
+        """프롬프트 변경 후 컴포넌트 재초기화"""
+        print("🔄 프롬프트 변경 감지 - 컴포넌트 재초기화 중...")
+        
+        # 프롬프트 의존 컴포넌트 재초기화
+        from prompts import SystemPrompts
+        system_prompts = SystemPrompts()
+        
+        # Generator 재초기화
+        self.generator = Generator(self.llm)
+        
+        # Evaluator 재초기화
+        self.evaluator = Evaluator(self.llm)
+        
+        # Integrator 재초기화
+        self.integrator = Integrator(self.llm)
+        
+        # MedGemma 검색기 재초기화 (사용 중이라면)
+        if hasattr(self, 'medgemma_searcher'):
+            self.medgemma_searcher = MedGemmaSearcher()
+        
+        # Memory Manager 재초기화
+        if hasattr(self, 'memory_manager'):
+            self.memory_manager = MemoryManager(self.llm)
+        
+        print("✅ 컴포넌트 재초기화 완료")
+        return True

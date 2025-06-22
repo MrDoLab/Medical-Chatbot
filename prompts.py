@@ -4,6 +4,12 @@ from typing import Dict, Any, Optional, List
 class PromptTemplate:
     """프롬프트 템플릿 클래스"""
     
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(SystemPrompts, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
     def __init__(self, content: str, version: str = "1.0", description: str = "", variables: List[str] = None):
         """
         프롬프트 템플릿 초기화
@@ -382,6 +388,18 @@ class SystemPrompts:
                     self._prompts[name].content = value
                     count += 1
         return count
+
+    def update(self, prompt_name: str, content: str) -> bool:
+        """프롬프트 내용 업데이트"""
+        if prompt_name in self._prompts:
+            self._prompts[prompt_name].content = content
+            self._last_updated = datetime.now()
+            return True
+        return False
+    
+    def get_last_updated(self) -> datetime:
+        """마지막 업데이트 시간 반환"""
+        return self._last_updated
 
 # 싱글톤 인스턴스 생성
 system_prompts = SystemPrompts()
