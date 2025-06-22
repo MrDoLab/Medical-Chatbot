@@ -131,6 +131,7 @@ def load_qa_evaluator():
         return MedicalQAEvaluator()
     except Exception as e:
         st.error(f"❌ QA 평가기 로드 실패: {str(e)}")
+        st.exception(e)
         return None
 
 # 프롬프트 관리자 로드
@@ -142,6 +143,7 @@ def load_prompt_manager():
         return PromptManager()
     except Exception as e:
         st.error(f"❌ 프롬프트 관리자 로드 실패: {str(e)}")
+        st.exception(e)
         return None
 
 # 세션 상태 초기화
@@ -309,6 +311,7 @@ def display_prompt_management_tab(rag_system, prompt_manager):
                     st.success(f"✅ '{preset_name}' 프리셋이 저장되었습니다!")
                 else:
                     st.error("❌ 프리셋 저장에 실패했습니다.")
+                    st.exception(e)
             else:
                 st.warning("⚠️ 프리셋 이름을 입력해주세요.")
         
@@ -335,6 +338,7 @@ def display_prompt_management_tab(rag_system, prompt_manager):
                             st.rerun()
                         else:
                             st.error("❌ 프리셋 로드에 실패했습니다.")
+                            st.exception(e)
     
     with col2:
         st.subheader("프롬프트 편집")
@@ -387,6 +391,7 @@ def display_prompt_management_tab(rag_system, prompt_manager):
                             st.error(f"❌ RAG 시스템 업데이트 실패: {str(e)}")
                 else:
                     st.error("❌ 프롬프트 업데이트에 실패했습니다.")
+                    st.exception(e)
         
         with col_y:
             if st.button("기본값으로 복원", disabled=not is_changed):
@@ -452,6 +457,7 @@ def main():
     
     if not rag_system:
         st.error("❌ 시스템을 로드할 수 없습니다. 관리자에게 문의하세요.")
+        st.exception(e)
         st.stop()
     
     # 사이드바
@@ -535,6 +541,7 @@ def main():
 
                     except Exception as e:
                         st.error(f"❌ 답변 생성 중 오류가 발생했습니다: {str(e)}")
+                        st.exception(e)
                         st.info("💡 잠시 후 다시 시도해주세요.")
 
         elif submit_button:
@@ -628,6 +635,7 @@ def main():
                     st.rerun()
             except Exception as e:
                 st.error(f"❌ 캐시 초기화 실패: {str(e)}")
+                st.exception(e)
 
         col1, col2 = st.columns(2)
         
@@ -695,6 +703,7 @@ def main():
                 display_prompt_management_tab(rag_system, prompt_manager)
             else:
                 st.error("❌ 프롬프트 관리자를 로드할 수 없습니다.")
+                st.exception(e)
             
     
 
