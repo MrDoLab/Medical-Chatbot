@@ -1,4 +1,4 @@
-# components/bedrock_retriever.py (간소화된 버전)
+# components/bedrock_retriever.py
 from typing import List
 from langchain_core.documents import Document
 import boto3

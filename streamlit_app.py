@@ -24,7 +24,7 @@ from PIL import Image
 
 # 페이지 설정
 st.set_page_config(
-    page_title="WKU MedLink",
+    page_title="WKUH MedLink",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -36,7 +36,7 @@ st.markdown("""
     font-size: 24px !important;
     color: #2c3e50;
     background-color: #f0f6fb;
-    padding: 20px 90px;
+    padding: 20px 80px;
     border-top: 2px solid transparent;
     border-bottom: none;
     border-radius: 10px 10px 10px 10px;
@@ -78,22 +78,33 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def render_chat_bubble(role: str, text: str):
-    icon = "🙋" if role == "user" else "🤖"
     align = "right" if role == "user" else "left"
-    bubble_color = "#e0f2ff" if role == "user" else "#f5f5f5"
-    border_color = "#a4cafe" if role == "user" else "#e2e8f0"
-
+    bubble_color = "#f0f6fb" if role == "user" else "#f0f2f6"
+    text_color = "#333" if role == "user" else "#333"
+    border_radius = "20px 20px 0 20px" if role == "user" else "20px 20px 20px 0"
+    margin_left = "20%" if role == "user" else "0"
+    margin_right = "0" if role == "user" else "20%"
     
     st.markdown(f"""
         <div style='text-align: {align}; margin: 10px 0;'>
-            <div style='display: inline-block; background-color: {bubble_color};
-                        border-left: 5px solid {border_color}; padding: 12px 16px;
-                        border-radius: 12px; max-width: 80%; font-size: 15px;
-                        color: #333;'>
-                <b>{icon} {'나' if role == "user" else 'Woni'}</b><br>{text}
+            <div style='
+                display: inline-block; 
+                background-color: {bubble_color};
+                color: {text_color};
+                padding: 14px 20px;
+                border-radius: {border_radius};
+                max-width: 75%;
+                font-size: 17px;
+                margin-left: {margin_left};
+                margin-right: {margin_right};
+                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+                line-height: 1.4;
+            '>
+                <b style='font-weight: 600;'>{'나' if role == "user" else 'Woni'}</b><br>{text}
             </div>
         </div>
     """, unsafe_allow_html=True)
+
     
 # RAG 시스템 로드 (캐시로 한 번만 로드)
 @st.cache_resource
@@ -189,42 +200,7 @@ def save_feedback(question: str, answer: str, rating: str, feedback_text: str = 
     except Exception as e:
         st.error(f"피드백 저장 실패: {e}")
 
-def display_system_stats(rag_system):
-    """시스템 통계 표시"""
-    if rag_system:
-        try:
-            stats = rag_system.get_stats()
-            
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                st.metric(
-                    label="📚 로드된 문서",
-                    value=f"{stats['document_stats']['total_documents']:,}개"
-                )
-            
-            with col2:
-                st.metric(
-                    label="🧠 총 임베딩",
-                    value=f"{stats['document_stats']['total_embeddings']:,}개"
-                )
-            
-            with col3:
-                st.metric(
-                    label="🔍 검색 횟수",
-                    value=f"{stats['search_performance']['searches_performed']:,}회"
-                )
-            
-            with col4:
-                st.metric(
-                    label="⚡ 평균 응답시간",
-                    value=f"{stats['search_performance']['average_response_time']:.1f}초"
-                )
-            
 
-            
-        except Exception as e:
-            st.error(f"통계 표시 오류: {e}")
 
 def display_conversation_analytics():
     """대화 분석 표시"""
@@ -452,7 +428,14 @@ def main():
     """메인 앱"""
     initialize_session_state()
     
-    st.title("MedLink")
+    st.markdown("""
+        <div style="display: inline-block; font-size: 2.5rem; font-weight: bold; margin-right: 10px; line-height: 1;">
+            MedLink
+        </div>
+        <span style="font-size: 0.7em; color: gray; vertical-align: middle;">AI chatbot service run by Wonkwang University Hospital</span>
+        """, unsafe_allow_html=True)
+
+
     st.markdown("<div style='margin-bottom: 30px;'></div>", unsafe_allow_html=True)
     # RAG 시스템 로드
     rag_system = load_rag_system()
@@ -466,51 +449,33 @@ def main():
     
     # 사이드바
     with st.sidebar:
-        # 사용 안내
-        st.header("💡 사용 안내")
+        st.header("TOP 10 FAQs")
         st.markdown("""
-        **질문 예시:**
+        **_**
         - 당뇨병 관리 방법은?
         - 고혈압 응급처치 절차는?
         - 심정지 환자 CPR 방법은?
-        
-        **주의사항:**
-        - 5자 이상의 구체적인 질문을 입력해주세요
-        - AI 답변은 참고용이며 전문의 진료 필요
         """)
         
-        st.markdown("---")
-        
-        # 접속자 정보
-        st.header("User Info")
-        st.write(f"**사용자 ID:** {st.session_state.user_id}")
-        st.write(f"**질문 수:** {len(st.session_state.conversation_history)}개")
-        
-        if st.button("🔄 세션 초기화"):
-            st.session_state.conversation_history = []
-            st.session_state.user_feedback = []
-            st.rerun()
     
     # 메인 영역 - 탭 구조 수정
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["질문", "분석", "설정", "프롬프트", "통계"])
+    tab1, tab2, tab3, tab4 = st.tabs(["대화 시작 (Chat)", "피드백 (Feedback)", "설정 (Settings)", "프롬프트 (Prompt)"])
     
     with tab1:
         # 👋 인사말
         st.markdown("""
         <div style='
-            border: 1px solid #bcd;
             border-radius: 12px;
             padding: 20px;
             background-color: #f2f8fc;
             margin-top: 20px;
-        '>안녕하세요, 원광대학교 병원 AI Woni 입니다. 무엇이 궁금하신가요?</div>
+        '>안녕하세요, 원광대학교 병원 AI 챗봇 상담사 Woni 입니다. 무엇이 궁금하신가요?</div>
         """, unsafe_allow_html=True)
 
         # 📝 질문 입력창
-# 📝 질문 입력창 (div 시작 → 입력창 → div 끝까지 한 블럭에)
         st.markdown("""
         <div style='
-            margin-top: 40px;
+            margin-top: 30px;
         '>
         """, unsafe_allow_html=True)
 
@@ -526,11 +491,11 @@ def main():
 
 
         # 버튼
-        col1, col2, _ = st.columns([1.2, 1.2, 3])
+        _, col1, col2, _ = st.columns([7, 1, 1, 7])
         with col1:
-            submit_button = st.button("질문하기", type="primary")
+            submit_button = st.button("질문", type="primary")
         with col2:
-            clear_button = st.button("입력 초기화")
+            clear_button = st.button("리셋")
 
         if clear_button:
             st.rerun()
@@ -538,7 +503,7 @@ def main():
         answer = None  # 답변 초기화
         if submit_button and question.strip():
             if len(question.strip()) < 5:
-                st.warning("⚠️ 더 구체적인 질문을 입력해주세요.")
+                st.warning("구체적인 질문을 입력해주세요. (5자 이상)")
             else:
                 with st.spinner("Woni가 답변을 준비 중입니다..."):
                     try:
@@ -567,7 +532,6 @@ def main():
 
         # 💬 최근 대화 (최신 질문 포함)
         if st.session_state.conversation_history:
-            st.markdown("---")
             for conv in st.session_state.conversation_history[-5:]:
                 render_chat_bubble("user", conv['question'])
                 render_chat_bubble("assistant", conv['answer'])
@@ -612,9 +576,27 @@ def main():
 
     
     with tab2:
-        st.header("📈 대화 분석")
-        display_conversation_analytics()
-    
+            st.subheader("📊 사용 통계")
+            
+            if st.session_state.conversation_history:
+                total_questions = len(st.session_state.conversation_history)
+                avg_response_time = sum(conv['response_time'] for conv in st.session_state.conversation_history) / total_questions
+                
+                st.metric("총 질문 수", f"{total_questions}개")
+                st.metric("평균 응답시간", f"{avg_response_time:.1f}초")
+                
+                # 피드백 통계
+                if st.session_state.user_feedback:
+                    feedback_counts = {}
+                    for feedback in st.session_state.user_feedback:
+                        rating = feedback['rating']
+                        feedback_counts[rating] = feedback_counts.get(rating, 0) + 1
+                    
+                    st.write("**사용자 평가:**")
+                    for rating, count in feedback_counts.items():
+                        st.write(f"- {rating}: {count}개")
+        
+        # 시스템 정보
     with tab3:
         st.header("⚙️ 시스템 설정")
         
@@ -876,9 +858,6 @@ class PromptManager:
             return False
                 """, language="python")
     
-    with tab5: 
-        st.header("통계")
-        display_system_stats(rag_system)
 
 if __name__ == "__main__":
     main()

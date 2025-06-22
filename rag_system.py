@@ -387,7 +387,7 @@ class RAGSystem:
 
     def get_stats(self) -> Dict[str, Any]:
         """시스템 통계"""
-        retriever_stats = self.retriever.get_stats()
+        retriever_stats = self.local_retriever.get_stats()
         
         return {
             "workflow_nodes": 6,  # 간소화된 노드 수

@@ -1,6 +1,6 @@
 # components/document_loader.py
 """
-문서 로딩 총괄 관리자 - 파일 타입별 적절한 프로세서에게 위임
+로컬 문서 로더
 """
 
 from typing import List, Dict, Any
@@ -136,20 +136,20 @@ class DocumentLoader:
         
         return Document(
             page_content=f"""
-파일명: {file_path.name}
-상태: 파일 크기 초과
+            파일명: {file_path.name}
+            상태: 파일 크기 초과
 
-파일 크기: {size_mb:.1f}MB (제한: 100MB)
+            파일 크기: {size_mb:.1f}MB (제한: 100MB)
 
-이 파일은 크기가 너무 커서 처리할 수 없습니다.
+            이 파일은 크기가 너무 커서 처리할 수 없습니다.
 
-권장 조치:
-1. 파일을 여러 개로 분할
-2. 압축률을 높여 크기 줄이기
-3. 핵심 내용만 별도 파일로 추출
+            권장 조치:
+            1. 파일을 여러 개로 분할
+            2. 압축률을 높여 크기 줄이기
+            3. 핵심 내용만 별도 파일로 추출
 
-원본 파일: {file_path}
-""",
+            원본 파일: {file_path}
+            """,
             metadata={
                 "source": str(file_path),
                 "title": file_path.stem,
@@ -166,22 +166,22 @@ class DocumentLoader:
         """지원되지 않는 파일용 Document"""
         return Document(
             page_content=f"""
-파일명: {file_path.name}
-상태: 지원되지 않는 형식
+            파일명: {file_path.name}
+            상태: 지원되지 않는 형식
 
-파일 형식: {extension}
+            파일 형식: {extension}
 
-현재 지원되는 파일 형식:
-• PDF: {', '.join(self.pdf_extensions)}
-• 텍스트: {', '.join(self.text_extensions)}
+            현재 지원되는 파일 형식:
+            • PDF: {', '.join(self.pdf_extensions)}
+            • 텍스트: {', '.join(self.text_extensions)}
 
-권장 조치:
-1. 지원되는 형식으로 변환
-2. 텍스트 내용을 .txt 파일로 추출
-3. 내용을 복사해서 새 파일 생성
+            권장 조치:
+            1. 지원되는 형식으로 변환
+            2. 텍스트 내용을 .txt 파일로 추출
+            3. 내용을 복사해서 새 파일 생성
 
-원본 파일: {file_path}
-""",
+            원본 파일: {file_path}
+            """,
             metadata={
                 "source": str(file_path),
                 "title": file_path.stem,
