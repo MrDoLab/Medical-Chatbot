@@ -438,7 +438,7 @@ def main():
         <div style="display: inline-block; font-size: 2.5rem; font-weight: bold; margin-right: 10px; line-height: 1;">
             MedLink
         </div>
-        <span style="font-size: 0.7em; color: gray; vertical-align: middle;">AI chatbot service run by Wonkwang University Hospital</span>
+        <span style="font-size: 1em; color: gray; vertical-align: middle;">AI chatbot service run by Wonkwang University Hospital</span>
         """, unsafe_allow_html=True)
 
 
