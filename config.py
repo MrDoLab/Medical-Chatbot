@@ -214,7 +214,7 @@ class Config:
             return False
 
     @classmethod
-    def get_system_prompt(cls, prompt_name: str, **kwargs):
+    def get_system_prompts(cls, prompt_name: str, **kwargs):
         """
         prompts.py의 시스템 프롬프트를 가져옵니다.
         
@@ -227,3 +227,18 @@ class Config:
         """
         from prompts import system_prompts
         return system_prompts.format(prompt_name, **kwargs) if kwargs else system_prompts.get(prompt_name)
+
+
+    @classmethod
+    def get_all_system_prompts(cls) -> dict:
+        """
+        모든 시스템 프롬프트를 반환합니다.
+        
+        Returns:
+            dict: 프롬프트 이름과 내용의 딕셔너리
+        """
+        prompts = {}
+        for attr in dir(cls):
+            if attr.endswith('_SYSTEM_PROMPT') and isinstance(getattr(cls, attr), str):
+                prompts[attr] = getattr(cls, attr)
+        return prompts

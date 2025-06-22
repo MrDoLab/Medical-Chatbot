@@ -266,8 +266,8 @@ def display_prompt_management_tab(rag_system, prompt_manager):
         # Config 클래스 임포트
         from config import Config
         
-        prompt_types = list(Config.get_system_prompts().keys())
-        
+        prompt_types = list(Config.get_all_system_prompts().keys())
+
         # 프롬프트 타입 선택 UI
         selected_prompt_type = st.selectbox(
             "프롬프트 유형:",
@@ -600,10 +600,31 @@ def main():
     with tab3:
         st.header("⚙️ 시스템 설정")
         
+        # 시스템 새로고침 버튼 추가
+        if st.button("🔄 RAG 시스템 새로고침", type="primary"):
+            # 캐시에서 RAG 시스템 키 제거
+            try:
+                # Streamlit 캐시 키 접근 및 제거
+                from streamlit.runtime.caching import get_cache_block_implementation
+                cache_impl = get_cache_block_implementation("resource")
+                if hasattr(cache_impl, "clear"):
+                    cache_impl.clear()
+                    st.success("✅ RAG 시스템 캐시가 초기화되었습니다. 새로고침됩니다.")
+                    st.rerun()
+                else:
+                    # 대안: 세션 상태에 플래그 설정
+                    st.session_state.rag_system_reset = True
+                    st.success("✅ RAG 시스템을 새로고침합니다.")
+                    st.rerun()
+            except Exception as e:
+                st.error(f"❌ 캐시 초기화 실패: {str(e)}")
+
         col1, col2 = st.columns(2)
         
         with col1:
             st.subheader("🔧 설정 옵션")
+
+            
             
             # 응답 모드 설정
             response_mode = st.selectbox(
