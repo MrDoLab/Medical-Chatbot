@@ -4,12 +4,6 @@ from datetime import datetime
 
 class PromptTemplate:
     """프롬프트 템플릿 클래스"""
-    
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(SystemPrompts, cls).__new__(cls)
-            cls._instance._initialized = False
-        return cls._instance
 
     def __init__(self, content: str, version: str = "1.0", description: str = "", variables: List[str] = None):
         """

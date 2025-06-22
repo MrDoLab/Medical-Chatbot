@@ -311,7 +311,6 @@ def display_prompt_management_tab(rag_system, prompt_manager):
                     st.success(f"✅ '{preset_name}' 프리셋이 저장되었습니다!")
                 else:
                     st.error("❌ 프리셋 저장에 실패했습니다.")
-                    st.exception(e)
             else:
                 st.warning("⚠️ 프리셋 이름을 입력해주세요.")
         
@@ -338,7 +337,6 @@ def display_prompt_management_tab(rag_system, prompt_manager):
                             st.rerun()
                         else:
                             st.error("❌ 프리셋 로드에 실패했습니다.")
-                            st.exception(e)
     
     with col2:
         st.subheader("프롬프트 편집")
@@ -391,7 +389,6 @@ def display_prompt_management_tab(rag_system, prompt_manager):
                             st.error(f"❌ RAG 시스템 업데이트 실패: {str(e)}")
                 else:
                     st.error("❌ 프롬프트 업데이트에 실패했습니다.")
-                    st.exception(e)
         
         with col_y:
             if st.button("기본값으로 복원", disabled=not is_changed):
@@ -457,7 +454,6 @@ def main():
     
     if not rag_system:
         st.error("❌ 시스템을 로드할 수 없습니다. 관리자에게 문의하세요.")
-        st.exception(e)
         st.stop()
     
     # 사이드바
@@ -619,30 +615,19 @@ def main():
         
         # 시스템 새로고침 버튼 추가
         if st.button("🔄 RAG 시스템 새로고침", type="primary"):
-            # 캐시에서 RAG 시스템 키 제거
             try:
-                # Streamlit 캐시 키 접근 및 제거
-                from streamlit.runtime.caching import get_cache_block_implementation
-                cache_impl = get_cache_block_implementation("resource")
-                if hasattr(cache_impl, "clear"):
-                    cache_impl.clear()
-                    st.success("✅ RAG 시스템 캐시가 초기화되었습니다. 새로고침됩니다.")
-                    st.rerun()
-                else:
-                    # 대안: 세션 상태에 플래그 설정
-                    st.session_state.rag_system_reset = True
-                    st.success("✅ RAG 시스템을 새로고침합니다.")
-                    st.rerun()
+                # 모든 캐시 리소스 초기화
+                st.cache_resource.clear()
+                st.success("✅ RAG 시스템 캐시가 초기화되었습니다. 새로고침됩니다.")
+                st.rerun()
             except Exception as e:
                 st.error(f"❌ 캐시 초기화 실패: {str(e)}")
-                st.exception(e)
+                st.info("💡 페이지를 수동으로 새로고침해보세요.")
 
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("🔧 설정 옵션")
-
-            
+            col1, col2 = st.columns(2)
+                
+            with col1:
+                st.subheader("🔧 설정 옵션")
             
             # 응답 모드 설정
             response_mode = st.selectbox(
@@ -703,7 +688,6 @@ def main():
                 display_prompt_management_tab(rag_system, prompt_manager)
             else:
                 st.error("❌ 프롬프트 관리자를 로드할 수 없습니다.")
-                st.exception(e)
             
     
 
