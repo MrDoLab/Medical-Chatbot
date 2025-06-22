@@ -117,6 +117,9 @@ def load_rag_system():
         return rag_system
     except Exception as e:
         st.error(f"❌ RAG 시스템 로드 실패: {str(e)}")
+        tb = traceback.format_exc()
+        with st.expander("상세 오류 정보"):
+            st.code(tb)
         return None
 
 # QA 평가기 로드
@@ -438,7 +441,7 @@ def main():
 
 
     st.markdown("<div style='margin-bottom: 30px;'></div>", unsafe_allow_html=True)
-    
+
     # RAG 시스템 로드
     rag_system = load_rag_system()
     
