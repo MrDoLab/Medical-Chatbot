@@ -1,71 +1,133 @@
 # streamlit_app.py
 """
-의료 AI 어시스턴트 웹 인터페이스
-- 외부 접속 가능한 Streamlit 서버
 - RAG 시스템과 연동
-- 실시간 질문/답변
-- 사용자 피드백 수집
-- 프롬프트 실시간 관리
 """
 
 import streamlit as st
 import time
 import json
-import os
 import traceback
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-from typing import Dict, List, Any
 from PIL import Image
+import base64
+from faq_utils import save_conversation_to_file, get_top_faq_questions, load_conversation_history
+import requests
+import feedparser
 
-ENABLE_PROMPT_EDITING = False
+
+loading_container = st.empty()
+
+if "initial_loading_done" not in st.session_state:
+    st.session_state["initial_loading_done"] = False
+
+if not st.session_state["initial_loading_done"]:
+    with loading_container.container():
+        
+        st.markdown("""
+            <div style='
+                    font-size: 45px;
+                    color: #333;
+                    line-height: 0.8;
+                    padding-left: 15px;
+                    font-weight: 500;
+                    margin-top: 300px;
+                    '>
+                    Welcome Back to <span style='color:#003366;'>WKUH MedLink...</span><br>
+                    <small style='font-size:18px; color:#7F8C8D;'>AI Chatbot Assistant for Smarter Decisions</small>
+            </div>
+            """, unsafe_allow_html=True)
+    time.sleep(2)
+    loading_container.empty()
+    st.session_state["initial_loading_done"] = True
+
+
+texts = {"input_placeholder_ko": "질문을 입력하세요. (예: 당뇨병 관리 방법은?)",
+         "input_placeholder_en": "Type your question here (e.g., How to manage diabetes?)"}
+
+
 
 # 페이지 설정
 st.set_page_config(
     page_title="WKUH MedLink",
+    page_icon = "hlogo.png",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded"    
 )
 
 st.markdown("""
     <style>
+
+    /* 탭 강조 색상 변경 */
+    .stTabs [aria-selected="true"] {
+        background-color: #003366 !important;
+        color: white !important;
+    }
+    button[kind="primary"] {
+        background-color: #003366 !important;
+        color: white !important;
+        border-radius: 8px;
+        font-size: 18px !important;
+    }
+    
+
     /* 기본 탭 스타일 */
     .stTabs [data-baseweb="tab"] {
-    font-size: 24px !important;
-    color: #2c3e50;
-    background-color: #f0f6fb;
-    padding: 20px 80px;
-    border-top: 2px solid transparent;
-    border-bottom: none;
-    border-radius: 10px 10px 10px 10px;
-    transition: background-color 0.3s ease;
+        padding: 25px 70px !important;
+        font-size: 38px !important;
+        color: #003366;
+        background-color: #f0f6fb;
+        border-top: 2px solid transparent;
+        border-radius: 8px 8px 0px 0px;
+        border-bottom: none;
+        transition: background-color 0.3s ease;
     }
+    
 
+    .stTabs [data-baseweb="tab"] div {
+        font-size: 20px !important;
+}
     /* 탭 hover 시 배경색 변경 */
     .stTabs [data-baseweb="tab"]:hover {
-    background-color: #d8eafd !important; /* 밝은 하늘색 */
-    color: #1f4e8c !important;
+        background-color: #d8eafd !important; 
+        color: #1f4e8c !important;
     }
 
     /* 선택된 탭 스타일 */
-    .stTabs [aria-selected="true"] {
-    background-color: #7dbdf5 !important;
-    color: white !important;
-    font-weight: 600 !important;
-    border-bottom: none;
-    }
 
+    textarea {
+        font-size: 20px !important;
+    }
+    
     /* 사이드바 스타일 */
     section[data-testid="stSidebar"] {
+    width: 330px !important;
+    resize: none !important;
     background-color: #f0f6fb !important;
     color: #2c3e50 !important;
+    align-items: left;
     padding: 20px;
     border-right: 1px solid #dbe9f5;
     }
+    
+    
+    /* 여기 사이드바 FAQ 버튼 텍스트 */
+    section[data-testid="stSidebar"] .stButton button div{
+        font-size: 18px !important;
+        text-align: left !important;
+        word-break: keep-all !important;
+    }
+    /* 버튼내부 span */
+    section[data-testid="stSidebar"] .stButton button span {
+        font-size: 20px !important;
+    }
+    /* 의료 뉴스 링크 */
+    section[data-testid="stSidebar"] a {
+        font-size: 18px !important;
+    }
 
+
+    
     section[data-testid="stSidebar"] .stMarkdown p {
     color: #2c3e50 !important;
     }
@@ -78,6 +140,25 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+
+
+
+def get_medical_news(n=3):
+    rss_url = "https://www.koreabiomed.com/rss/allArticle.xml"
+    news_list = []
+
+    try:
+        feed = feedparser.parse(rss_url)
+        for entry in feed.entries[:n]:
+            title = entry.title
+            link = entry.link
+            news_list.append((title, link))
+        return news_list
+
+    except Exception as e:
+        st.warning(f"의료 뉴스를 불러오는 데 실패했습니다: {e}")
+        return []
+    
 def render_chat_bubble(role: str, text: str):
     align = "right" if role == "user" else "left"
     bubble_color = "#f0f6fb" if role == "user" else "#f0f2f6"
@@ -95,7 +176,7 @@ def render_chat_bubble(role: str, text: str):
                 padding: 14px 20px;
                 border-radius: {border_radius};
                 max-width: 75%;
-                font-size: 17px;
+                font-size: 20px;
                 margin-left: {margin_left};
                 margin-right: {margin_right};
                 box-shadow: 0 2px 5px rgba(0,0,0,0.1);
@@ -107,6 +188,23 @@ def render_chat_bubble(role: str, text: str):
     """, unsafe_allow_html=True)
 
     
+def get_base64_image(image_path):
+    with open(image_path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
+    
+def initialize_session_state():
+    if 'conversation_history' not in st.session_state:
+        st.session_state.conversation_history = load_conversation_history()
+    if 'user_feedback' not in st.session_state:
+        st.session_state.user_feedback = []
+    if 'user_id' not in st.session_state:
+        st.session_state.user_id = f"user_{int(time.time())}"
+    if 'intro_shown' not in st.session_state:
+        st.session_state.intro_shown = False
+    if 'display_history' not in st.session_state:
+        st.session_state.display_history = []  # 화면에 잠깐 보여줄 대화 리스트
+
+        
 # RAG 시스템 로드 (캐시로 한 번만 로드)
 @st.cache_resource
 def load_rag_system():
@@ -117,9 +215,6 @@ def load_rag_system():
         return rag_system
     except Exception as e:
         st.error(f"❌ RAG 시스템 로드 실패: {str(e)}")
-        tb = traceback.format_exc()
-        with st.expander("상세 오류 정보"):
-            st.code(tb)
         return None
 
 # QA 평가기 로드
@@ -131,38 +226,10 @@ def load_qa_evaluator():
         return MedicalQAEvaluator()
     except Exception as e:
         st.error(f"❌ QA 평가기 로드 실패: {str(e)}")
-        st.exception(e)
-        return None
-
-# 프롬프트 관리자 로드
-@st.cache_resource
-def load_prompt_manager():
-    """프롬프트 관리자 로드"""
-    try:
-        from prompt_manager import PromptManager
-        return PromptManager()
-    except Exception as e:
-        st.error(f"❌ 프롬프트 관리자 로드 실패: {str(e)}")
-        st.exception(e)
         return None
 
 # 세션 상태 초기화
-def initialize_session_state():
-    """세션 상태 초기화"""
-    if 'conversation_history' not in st.session_state:
-        st.session_state.conversation_history = []
-    if 'user_feedback' not in st.session_state:
-        st.session_state.user_feedback = []
-    if 'system_stats' not in st.session_state:
-        st.session_state.system_stats = {}
-    if 'user_id' not in st.session_state:
-        st.session_state.user_id = f"user_{int(time.time())}"
-    if 'current_prompt_type' not in st.session_state:
-        st.session_state.current_prompt_type = "RAG_SYSTEM_PROMPT"
-    if 'edited_prompts' not in st.session_state:
-        st.session_state.edited_prompts = {}
-    if 'prompt_edit_history' not in st.session_state:
-        st.session_state.prompt_edit_history = []
+
 
 def save_conversation(question: str, answer: str, response_time: float, sources: int = 0):
     """대화 저장"""
@@ -175,6 +242,8 @@ def save_conversation(question: str, answer: str, response_time: float, sources:
         'user_id': st.session_state.user_id
     }
     st.session_state.conversation_history.append(conversation_entry)
+    save_conversation_to_file(conversation_entry)
+
 
 def save_feedback(question: str, answer: str, rating: str, feedback_text: str = ""):
     """사용자 피드백 저장"""
@@ -207,41 +276,6 @@ def save_feedback(question: str, answer: str, rating: str, feedback_text: str = 
         st.error(f"피드백 저장 실패: {e}")
 
 
-
-def display_conversation_analytics():
-    """대화 분석 표시"""
-    if not st.session_state.conversation_history:
-        st.info("📭 아직 대화 기록이 없습니다.")
-        return
-    
-    # 응답시간 분석
-    response_times = [conv['response_time'] for conv in st.session_state.conversation_history]
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # 응답시간 히스토그램
-        fig_hist = px.histogram(
-            x=response_times,
-            title="📊 응답시간 분포",
-            labels={'x': '응답시간 (초)', 'y': '빈도'},
-            nbins=10
-        )
-        st.plotly_chart(fig_hist, use_container_width=True)
-    
-    with col2:
-        # 시간대별 사용량
-        timestamps = [datetime.fromisoformat(conv['timestamp']) for conv in st.session_state.conversation_history]
-        hours = [ts.hour for ts in timestamps]
-        
-        fig_time = px.histogram(
-            x=hours,
-            title="🕐 시간대별 사용량",
-            labels={'x': '시간 (24시간)', 'y': '질문 수'},
-            nbins=24
-        )
-        st.plotly_chart(fig_time, use_container_width=True)
-    
     # 최근 대화들
     st.subheader("💬 최근 대화 기록")
     recent_conversations = st.session_state.conversation_history[-5:]
@@ -251,265 +285,231 @@ def display_conversation_analytics():
             st.write(f"**질문:** {conv['question']}")
             st.write(f"**답변:** {conv['answer'][:200]}...")
             st.write(f"**응답시간:** {conv['response_time']:.1f}초")
-            st.write(f"**시간:** {conv['timestamp'][:19]}")
-
-def display_prompt_management_tab(rag_system, prompt_manager):
-    """프롬프트 관리 탭 UI"""
-    st.header("✏️ 프롬프트 관리")
-    
-    # 설명
-    st.markdown("""
-    이 페이지에서는 의료 AI 시스템의 프롬프트를 직접 수정하고 관리할 수 있습니다.
-    프롬프트는 AI의 동작 방식을 결정하는 핵심 요소입니다.
-    """)
-    
-    # 프롬프트 타입 선택
-    col1, col2 = st.columns([1, 2])
-    
-    with col1:
-        st.subheader("프롬프트 선택")
-        
-        # Config 클래스 임포트
-        from config import Config
-        
-        prompt_types = list(Config.get_all_system_prompts().keys())
-
-        # 프롬프트 타입 선택 UI
-        selected_prompt_type = st.selectbox(
-            "프롬프트 유형:",
-            prompt_types,
-            index=prompt_types.index(st.session_state.current_prompt_type) if st.session_state.current_prompt_type in prompt_types else 0
-        )
-        
-        # 선택된 프롬프트 타입 저장
-        st.session_state.current_prompt_type = selected_prompt_type
-        
-        # 프롬프트 설명
-        prompt_descriptions = {
-            "RAG_SYSTEM_PROMPT": "주요 답변 생성에 사용되는 프롬프트입니다.",
-            "ROUTER_SYSTEM_PROMPT": "질문을 적절한 검색 방법으로 라우팅합니다.",
-            "GRADER_SYSTEM_PROMPT": "검색된 문서의 관련성을 평가합니다.",
-            "HALLUCINATION_SYSTEM_PROMPT": "생성된 답변의 환각을 검출합니다.",
-            "REWRITER_SYSTEM_PROMPT": "질문을 검색에 최적화된 형태로 재작성합니다."
-        }
-        
-        st.info(prompt_descriptions.get(selected_prompt_type, "이 프롬프트에 대한 설명이 없습니다."))
-        
-        # 프리셋 관리
-        st.subheader("프리셋 관리")
-        
-        # 프리셋 저장
-        preset_name = st.text_input("프리셋 이름:", key="preset_name_input")
-        if st.button("현재 프롬프트 저장", key="save_preset_button"):
-            if preset_name:
-                # 현재 수정된 프롬프트 포함하여 저장
-                all_prompts = Config.get_system_prompts()
-                all_prompts.update(st.session_state.edited_prompts)
-                
-                success = prompt_manager.save_preset(preset_name, all_prompts)
-                if success:
-                    st.success(f"✅ '{preset_name}' 프리셋이 저장되었습니다!")
-                else:
-                    st.error("❌ 프리셋 저장에 실패했습니다.")
-            else:
-                st.warning("⚠️ 프리셋 이름을 입력해주세요.")
-        
-        # 프리셋 목록 및 로드
-        presets = prompt_manager.get_preset_list()
-        if presets:
-            st.subheader("저장된 프리셋")
-            
-            for preset in presets:
-                col_a, col_b = st.columns([3, 1])
-                with col_a:
-                    st.write(f"**{preset['name']}** ({preset['prompt_count']}개 프롬프트)")
-                with col_b:
-                    if st.button("로드", key=f"load_{preset['name']}"):
-                        loaded_prompts = prompt_manager.load_preset(preset['name'])
-                        if loaded_prompts:
-                            # 모든 프롬프트 업데이트
-                            for p_type, p_content in loaded_prompts.items():
-                                Config.update_system_prompt(p_type, p_content)
-                                st.session_state.edited_prompts[p_type] = p_content
-                            
-                            # 새로고침 필요
-                            st.success("✅ 프리셋을 로드했습니다. 적용을 위해 새로고침합니다.")
-                            st.rerun()
-                        else:
-                            st.error("❌ 프리셋 로드에 실패했습니다.")
-    
-    with col2:
-        st.subheader("프롬프트 편집")
-        
-        # 현재 프롬프트 내용 가져오기
-        current_content = ""
-        if selected_prompt_type in st.session_state.edited_prompts:
-            current_content = st.session_state.edited_prompts[selected_prompt_type]
-        else:
-            current_content = getattr(Config, selected_prompt_type, "")
-        
-        # 프롬프트 편집 UI
-        edited_content = st.text_area(
-            "프롬프트 내용:",
-            value=current_content,
-            height=400,
-            key=f"prompt_editor_{selected_prompt_type}"
-        )
-        
-        # 변경 여부 확인
-        is_changed = edited_content != current_content
-        
-        col_x, col_y, col_z = st.columns([1, 1, 2])
-        
-        with col_x:
-            if st.button("적용", type="primary", disabled=not is_changed):
-                # 프롬프트 업데이트
-                success = Config.update_system_prompt(selected_prompt_type, edited_content)
-                
-                if success:
-                    # 세션에 변경사항 저장
-                    st.session_state.edited_prompts[selected_prompt_type] = edited_content
-                    
-                    # 변경 이력 추가
-                    st.session_state.prompt_edit_history.append({
-                        "timestamp": datetime.now().isoformat(),
-                        "prompt_type": selected_prompt_type,
-                        "old_content": current_content[:100] + "..." if len(current_content) > 100 else current_content,
-                        "new_content": edited_content[:100] + "..." if len(edited_content) > 100 else edited_content
-                    })
-                    
-                    st.success("✅ 프롬프트가 업데이트되었습니다!")
-                    
-                    # RAG 시스템 컴포넌트 새로고침
-                    if hasattr(rag_system, 'refresh_components'):
-                        try:
-                            rag_system.refresh_components()
-                            st.success("✅ RAG 시스템이 새 프롬프트로 업데이트되었습니다!")
-                        except Exception as e:
-                            st.error(f"❌ RAG 시스템 업데이트 실패: {str(e)}")
-                else:
-                    st.error("❌ 프롬프트 업데이트에 실패했습니다.")
-        
-        with col_y:
-            if st.button("기본값으로 복원", disabled=not is_changed):
-                # 원래 Config의 프롬프트로 복원
-                original_content = getattr(Config, selected_prompt_type, "")
-                
-                # 세션 상태에서 제거
-                if selected_prompt_type in st.session_state.edited_prompts:
-                    del st.session_state.edited_prompts[selected_prompt_type]
-                
-                # Config 업데이트
-                Config.update_system_prompt(selected_prompt_type, original_content)
-                
-                st.success("✅ 기본값으로 복원되었습니다!")
-                st.rerun()
-    
-    # 변경 이력 표시
-    if st.session_state.prompt_edit_history:
-        st.subheader("프롬프트 변경 이력")
-        
-        history_df = pd.DataFrame(st.session_state.prompt_edit_history)
-        # 날짜 형식 변환
-        history_df['timestamp'] = pd.to_datetime(history_df['timestamp']).dt.strftime('%Y-%m-%d %H:%M:%S')
-        
-        # 테이블 표시
-        st.dataframe(
-            history_df[['timestamp', 'prompt_type', 'old_content', 'new_content']],
-            column_config={
-                "timestamp": "변경 시간",
-                "prompt_type": "프롬프트 유형",
-                "old_content": "이전 내용",
-                "new_content": "새 내용"
-            },
-            use_container_width=True
-        )
-        
-        if st.button("이력 초기화", key="clear_history"):
-            st.session_state.prompt_edit_history = []
-            st.success("✅ 변경 이력이 초기화되었습니다.")
-            st.rerun()
+            st.write(f"**시간:** {conv['timestamp'][:19]}")   
 
 def main():
     """메인 앱"""
     initialize_session_state()
     
-    st.markdown("""
-        <div style="display: inline-block; font-size: 2.5rem; font-weight: bold; margin-right: 10px; line-height: 1;">
-            MedLink
+    if "lang" not in st.session_state:
+        st.session_state["lang"] = "ko"  # 기본 한국어
+
+    lang = st.session_state["lang"]
+    lang_placeholder = st.empty()
+    
+    if st.session_state.get("lang_changing", False):
+        st.session_state["lang_changing"] = False
+        loading_container = st.empty()
+        with loading_container.container():
+            st.markdown("""
+                    <div style = '
+                        display:flex;
+                        align-items: center;
+                        flex-direction: column;
+                        margin-top: 90px;
+                        justify-content: center;
+                        font-size: 22px;
+                        text-align: center;
+                        color:#7F8C8D;
+                    '>
+                        언어 설정을 변경하는 중입니다... 잠시만 기다려 주세요.
+                    </div>
+                    """, unsafe_allow_html=True)
+            time.sleep(1)
+            st.rerun()
+    
+    with lang_placeholder.container():
+        st.markdown("<div class='lang-buttons'>", unsafe_allow_html= True)
+        _, col2, col3, col4 = st.columns([17, 1, 0.8, 1])
+        
+        with col3:
+            if st.button("한글", key="btn_ko"):  # 한국 국기
+                st.session_state["lang"] = "ko"
+                st.session_state["lang_changing"] = True
+                st.rerun()
+                
+        with col4:
+            if st.button("English", key="btn_en"):  # 미국 국기
+                st.session_state["lang"] = "en"
+                st.session_state["lang_changing"] = True
+                st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    image_base64 = get_base64_image("hlogo.png")
+
+# 원래 pic height 78px
+
+    st.markdown(f"""
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 30px;">
+            <img src="data:image/png;base64,{image_base64}" 
+                style="height: 135px; border-radius: 14px;" />
+            <div style="display: flex; flex-direction: column;">
+                <div style="font-size: 3.1rem; color: #003366; font-weight: bold; line-height: 1;">MedLink</div>
+                <span style="font-size: 1.2em; font-weight: light-bold; color: #003366; margin-top: 7px;">제생의세(濟生醫世) 정신으로 의술로써 병든 세상을 구한다</span>
+                <span style="font-size: 1.1em; color: gray;">AI chatbot service run by Wonkwang University Hospital</span>
+            </div>
         </div>
-        <span style="font-size: 1em; color: gray; vertical-align: middle;">AI chatbot service run by Wonkwang University Hospital</span>
-        """, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
+    
 
 
     st.markdown("<div style='margin-bottom: 30px;'></div>", unsafe_allow_html=True)
-
+    
     # RAG 시스템 로드
     rag_system = load_rag_system()
-    
-    # 프롬프트 관리자 로드
-    prompt_manager = None
-    if ENABLE_PROMPT_EDITING:   
-        prompt_manager = load_prompt_manager()
-    
+
     if not rag_system:
         st.error("❌ 시스템을 로드할 수 없습니다. 관리자에게 문의하세요.")
         st.stop()
-    
-    # 사이드바
-    with st.sidebar:
-        st.header("TOP 10 FAQs")
-        st.markdown("""
-        **_**
-        - 당뇨병 관리 방법은?
-        - 고혈압 응급처치 절차는?
-        - 심정지 환자 CPR 방법은?
-        """)
         
-    
-    # 메인 영역 - 탭 구조
-    if ENABLE_PROMPT_EDITING:
-        tab1, tab2, tab3, tab4 = st.tabs(["대화 시작 (Chat)", "피드백 (Feedback)", "설정 (Settings)", "프롬프트 (Prompt)"])
-    else:
-        tab1, tab2, tab3 = st.tabs(["대화 시작 (Chat)", "피드백 (Feedback)", "설정 (Settings)"])
+    base_faq = [
+        "폐렴 치료에서 CURB-65 점수의 해석은?",
+        "WPW syndrome의 금기 약물은?",
+        "SIADH의 진단 기준은 무엇인가?",
+        "Kawasaki disease의 진단 기준과 치료는?",
+        "의식저하 환자에서 hypoglycemia rule-out 순서는?",
+        "Parkinson 병의 cardinal signs는?",
+        "Trauma 환자에서 GCS 계산 방법은?",
+    ]
 
-    with tab1:
-        # 👋 인사말
+    #잠시 비활성화
+    faq_questions = get_top_faq_questions(default_questions=base_faq, update_days=10)
+
+    with st.sidebar:
         st.markdown("""
-        <div style='
-            border-radius: 12px;
-            padding: 20px;
-            background-color: #f2f8fc;
-            margin-top: 20px;
-        '>안녕하세요, 원광대학교 병원 AI 챗봇 상담사 Woni 입니다. 무엇이 궁금하신가요?</div>
-        """, unsafe_allow_html=True)
+            <div style='font-size: 22px; font-weight: bold;'><br>자주 묻는 질문</div>
+            """  if lang=="ko" else """
+            <div style='font-size: 24px; font-weight: bold;'><br>TOP 7 FAQs</div>
+            """, unsafe_allow_html=True)
+        st.markdown(
+            '<p style="font-size: 16px; color: gray;">* 10일 주기로 업데이트됩니다.</p>' if lang=="ko"
+            else '<p style="font-size: 16px; color: gray;">* Updates every 10 days.</p>' ,
+            unsafe_allow_html=True)
 
+        for i, question in enumerate(faq_questions):
+            if st.button(question, key=f"faq_{i}"):
+                st.session_state.chat_input = question
+                st.session_state.trigger_faq_submit = True
+
+        # 👇 최신 뉴스 3개 세로로 추가
+        news = get_medical_news(n=3)
+        if news:
+            st.markdown("""<hr>
+            <div style='margin-top: 20px; font-size: 22px; font-weight: bold;'><br>최근 의료 소식</div>
+            """  if lang=="ko" else """<hr>
+            <div style='margin-top: 20px; font-size: 24px; font-weight: bold;'><br>Medical News</div>
+            """, unsafe_allow_html=True)
+
+            for title, link in news:
+                short_title = title[:60] + "..." if len(title) > 60 else title
+                st.markdown(f"""
+                    <a href="{link}" target="_blank" 
+                    style="
+                        display: block;
+                        background-color: white;
+                        color: #2c3e50;
+                        font-size: 18px;
+                        padding: 10px 12px;
+                        border-radius: 8px;
+                        text-decoration: none;
+                        margin-top: 10px;
+                        box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+                        border: 1px solid #90caf9;
+                    ">
+                        {short_title}
+                    </a>
+                """, unsafe_allow_html=True)
+                
+            
+            
+            st.markdown("""
+                <hr>
+                <div style='text-align: center; font-size: 18px; color: gray; margin-top: 30px;'>
+                    실시간 의료 뉴스는 코리아바이오메드 (Korea Biomedical Review)에서 제공합니다.<br><br><br>
+                    <b>WKUH MedLink v1.0</b><br>
+                    최종 업데이트: 2025.06.29<br><br>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # 메인 영역 - 탭 구조 수정
+    tab1, tab2, tab3 = st.tabs([
+        "질문" if lang =="ko" else "Ask",
+        "지난 대화" if lang=="ko" else "Chat History",
+        "⚙️ 설정" if lang=="ko" else "⚙️ Settings"])
+   
+        
+    with tab1:
+        # 👋 인사말 박스 전체
+        message = "안녕하세요, 원광대학교 병원 AI 챗봇 상담사 Woni 입니다. 무엇이 궁금하신가요?" if lang=="ko" else "Hello, I am Woni, AI chatbot from WKUH. How can I help you?"
+
+        if not st.session_state.intro_shown:
+            placeholder = st.empty()
+            typed_text = ""
+
+            for char in message:
+                typed_text += char
+                placeholder.markdown(f"""
+                <div style='
+                    border-left: 6px solid var(--primary-color);
+                    border-radius: 8px;
+                    padding: 16px;
+                    background-color: var(--accent-color);
+                    margin-top: 20px;
+                    line-height: 1.6;
+                '>
+                    <div style='font-size: 20px; line-height: 1.4;'>{typed_text}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                time.sleep(0.02)
+
+            st.session_state.intro_shown = True  # 타이핑 효과 딱 한 번만 실행
+        else:
+            st.markdown(f"""
+            <div style='
+                border-left: 6px solid var(--primary-color);
+                border-radius: 8px;
+                padding: 16px;
+                background-color: var(--accent-color);
+                margin-top: 20px;
+                line-height: 1.6;
+            '>
+                <div style='font-size: 20px; line-height: 1.4;'>{message}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
         # 📝 질문 입력창
         st.markdown("""
         <div style='
             margin-top: 30px;
         '>
         """, unsafe_allow_html=True)
-
+            
         question = st.text_area(
             label="",
-            placeholder="질문을 입력하세요. (예: 당뇨병 관리 방법은?)",
+            placeholder=texts['input_placeholder_ko'] if lang == "ko" else texts['input_placeholder_en'],
             height=100,
             key="chat_input",
             label_visibility="collapsed"
         )
 
         st.markdown("</div>", unsafe_allow_html=True)
-
-
+        
         # 버튼
         _, col1, col2, _ = st.columns([7, 1, 1, 7])
-        with col1:
-            submit_button = st.button("질문", type="primary")
+        
+        if st.session_state.get("trigger_faq_submit", False):
+            question = st.session_state.get("chat_input", "")
+            st.session_state.trigger_faq_submit = False
+            submit_button = True
+        else:
+            with col1:
+                submit_button = st.button("질문", type="primary", help="질문 보내기")
         with col2:
-            clear_button = st.button("리셋")
+            clear_button = st.button("리셋", help="새로운 대화")
 
         if clear_button:
+            st.session_state.display_history = []
+            st.session_state.intro_shown = False
             st.rerun()
 
         answer = None  # 답변 초기화
@@ -517,14 +517,13 @@ def main():
             if len(question.strip()) < 5:
                 st.warning("구체적인 질문을 입력해주세요. (5자 이상)")
             else:
-                with st.spinner("Woni가 답변을 준비 중입니다..."):
+                with st.spinner(""):
                     try:
                         start_time = time.time()
                         result = rag_system.run_graph(question, st.session_state.user_id)
                         end_time = time.time()
                         response_time = end_time - start_time
 
-                        # 결과 처리
                         if isinstance(result, dict):
                             answer = result.get("answer", str(result))
                             sources_count = len(result.get("source_breakdown", {}).get("rag", []))
@@ -532,20 +531,26 @@ def main():
                             answer = str(result)
                             sources_count = 0
 
-                        # 대화 저장
+                        # 전체 대화 저장
                         save_conversation(question, answer, response_time, sources_count)
+
+                        # 화면 출력용 대화만 따로 관리
+                        st.session_state.display_history.append({
+                            "question": question,
+                            "answer": answer
+                        })
 
                     except Exception as e:
                         st.error(f"❌ 답변 생성 중 오류가 발생했습니다: {str(e)}")
-                        st.exception(e)
-                        st.info("💡 잠시 후 다시 시도해주세요.")
+                        st.info("잠시 후 다시 시도해주세요.")
+
 
         elif submit_button:
-            st.warning("⚠️ 질문을 입력해주세요.")
+            st.warning("질문을 입력해주세요.")
 
         # 💬 최근 대화 (최신 질문 포함)
-        if st.session_state.conversation_history:
-            for conv in st.session_state.conversation_history[-5:]:
+        if st.session_state.display_history:
+            for conv in st.session_state.display_history:
                 render_chat_bubble("user", conv['question'])
                 render_chat_bubble("assistant", conv['answer'])
 
@@ -588,33 +593,21 @@ def main():
                     st.success("추가 의견이 저장되었습니다!")
 
     
-    with tab2:
-            st.subheader("📊 사용 통계")
-            
-            if st.session_state.conversation_history:
-                total_questions = len(st.session_state.conversation_history)
-                avg_response_time = sum(conv['response_time'] for conv in st.session_state.conversation_history) / total_questions
-                
-                st.metric("총 질문 수", f"{total_questions}개")
-                st.metric("평균 응답시간", f"{avg_response_time:.1f}초")
-                
-                # 피드백 통계
-                if st.session_state.user_feedback:
-                    feedback_counts = {}
-                    for feedback in st.session_state.user_feedback:
-                        rating = feedback['rating']
-                        feedback_counts[rating] = feedback_counts.get(rating, 0) + 1
-                    
-                    st.write("**사용자 평가:**")
-                    for rating, count in feedback_counts.items():
-                        st.write(f"- {rating}: {count}개")
-        
-        # 시스템 정보
+
     with tab3:
-        st.header("⚙️ 시스템 설정")
-        
-        # 시스템 새로고침 버튼 추가
-        if st.button("🔄 RAG 시스템 새로고침", type="primary"):
+        st.markdown("""
+            <div style= '
+            font-size: 24px;
+            font-weight: bold;
+            margin-top: 20px;
+            margin-bottom: 15px;
+            '>
+                시스템 설정
+            </div>
+            """, unsafe_allow_html=True)
+
+        # 시스템 새로고침 버튼 추가 
+        if st.button("🔄 RAG 새로고침", type="primary"):
             try:
                 # 모든 캐시 리소스 초기화
                 st.cache_resource.clear()
@@ -623,73 +616,142 @@ def main():
             except Exception as e:
                 st.error(f"❌ 캐시 초기화 실패: {str(e)}")
                 st.info("💡 페이지를 수동으로 새로고침해보세요.")
-
-            col1, col2 = st.columns(2)
-                
-            with col1:
-                st.subheader("🔧 설정 옵션")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("설정 옵션")
             
-            # 응답 모드 설정
             response_mode = st.selectbox(
                 "응답 모드:",
                 ["상세 답변", "간단 답변", "요약 답변"],
                 index=0
             )
             
-            # 안전 모드
             safety_mode = st.checkbox("🛡️ 안전 모드 (응급상황 우선 알림)", value=True)
-            
-            # 소스 표시
             show_sources = st.checkbox("📚 참고 문서 표시", value=True)
             
-        with col2:
-            st.subheader("📊 사용 통계")
-            
-            if st.session_state.conversation_history:
-                total_questions = len(st.session_state.conversation_history)
-                avg_response_time = sum(conv['response_time'] for conv in st.session_state.conversation_history) / total_questions
-                
-                st.metric("총 질문 수", f"{total_questions}개")
-                st.metric("평균 응답시간", f"{avg_response_time:.1f}초")
-                
-                # 피드백 통계
-                if st.session_state.user_feedback:
-                    feedback_counts = {}
-                    for feedback in st.session_state.user_feedback:
-                        rating = feedback['rating']
-                        feedback_counts[rating] = feedback_counts.get(rating, 0) + 1
-                    
-                    st.write("**사용자 평가:**")
-                    for rating, count in feedback_counts.items():
-                        st.write(f"- {rating}: {count}개")
         
-        # 시스템 정보
-        st.markdown("---")
-        st.subheader("🖥️ 시스템 정보")
         
-        if rag_system:
-            stats = rag_system.get_stats()
-            
-            system_info = {
-                "임베딩 모델": stats['model_info']['embedding_model'],
-                "임베딩 차원": f"{stats['model_info']['dimensions']:,}",
-                "총 문서 수": f"{stats['document_stats']['total_documents']:,}개",
-                "카테고리 수": f"{stats['document_stats']['index_categories']:,}개",
-                "예상 비용": f"${stats['cost_estimate']['estimated_cost_usd']:.4f}"
-            }
-            
-            for key, value in system_info.items():
-                st.write(f"**{key}:** {value}")
-    
-    if ENABLE_PROMPT_EDITING:
-        with tab4:
-            # 프롬프트 관리 탭
-            if prompt_manager:
-                display_prompt_management_tab(rag_system, prompt_manager)
-            else:
-                st.error("❌ 프롬프트 관리자를 로드할 수 없습니다.")
-            
-    
+    with tab2:
+        if lang == "ko":
+            text = """
+            <div id="history-area" style='
+                font-size: 24px;
+                font-weight: bold;
+                margin-top: 20px;
+                margin-bottom: 15px;
+            '>
+                대화 기록 검색
+            </div>
+            """
+        else:
+            text = """
+            <div id="history-area" style='
+                font-size: 24px;
+                font-weight: bold;
+                margin-top: 20px;
+                margin-bottom: 15px;
+            '>
+                Search Chat History
+            </div>
+            """
 
+        st.markdown(text, unsafe_allow_html=True)
+
+
+        if st.session_state.conversation_history:
+            total_questions = len(st.session_state.conversation_history)
+
+            st.markdown(f"""
+                <div style='
+                    font-size: 20px;
+                    margin-bottom: 20px;
+                '>
+                    총 <span style="font-weight: bold;">{total_questions}</span>개의 대화가 저장되어 있습니다.
+                </div>
+            """, unsafe_allow_html=True)
+
+            # 검색창
+            st.markdown("""
+                <div style='
+                    font-size: 18px;
+                    margin-bottom: 5px;
+                '>검색 키워드를 입력하세요</div>
+            """, unsafe_allow_html=True)
+
+            keyword_input = st.text_input(
+                label="",  
+                placeholder="키워드 입력 후 엔터",
+                label_visibility="collapsed"
+            )
+
+            st.markdown("""
+                <div style='
+                    font-size: 18px;
+                    margin-top: 10px;
+                    margin-bottom: 5px;
+                '>검색일 수 (일)</div>
+            """, unsafe_allow_html=True)
+
+            days_filter = st.slider("", min_value=1, max_value=90, value=30, step=1, label_visibility="collapsed")
+
+            now = datetime.now()
+            
+            # 필터링된 대화 리스트
+            filtered = []
+            for conv in reversed(st.session_state.conversation_history):
+                timestamp = datetime.fromisoformat(conv["timestamp"])
+                if (now - timestamp).days > days_filter:
+                    continue
+
+                if keyword_input:
+                    keywords = [k.strip().lower() for k in keyword_input.split()]
+                    q_lower = conv["question"].lower()
+                    a_lower = conv["answer"].lower()
+                    
+                    if all(kw in q_lower or kw in a_lower for kw in keywords):
+                        filtered.append(conv)
+                else:
+                    filtered.append(conv)
+
+            st.markdown(f"<div style='font-size: 20px; margin-top: 60px; margin-bottom: 10px;'><b>기간 내 검색결과 : {len(filtered)}건</b><br>", unsafe_allow_html=True)
+            
+            # 스택형 아코디언 출력
+            for idx, conv in enumerate(filtered, start=1):
+                st.markdown("""
+                <style>
+                div [role="button"] > div {
+                    font-size:22px;
+                    padding: 25px;
+                    line-height: 2;
+                }
+                </style>
+                """, unsafe_allow_html= True)
+                with st.expander(f"Q{idx}: {conv['question'][:50]}..."):
+                    st.markdown(f"""
+                        <div style='
+                            background-color: #f9fcff;
+                            padding: 25px;
+                            border-radius: 8px;
+                            border: 1px solid #dbe9f5;
+                            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+                            margin-bottom: 10px;
+                            line-height: 1.6;
+                            font-size: 20px;
+                        '>
+                            <b style='color: #2c3e50;'>질문:</b> {conv['question']}<br><br>
+                            <b style='color: #2c3e50;'>답변:</b> {conv['answer']}<br><br>
+                            <b style='color: #2c3e50;'>시간:</b> {conv['timestamp'][:19]}<br>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+            
+        else:
+            st.info("대화 기록이 없습니다.")
+
+   
+
+            
 if __name__ == "__main__":
     main()
