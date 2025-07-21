@@ -4,6 +4,7 @@ from datetime import datetime
 import yaml
 import os
 import json
+import time
 
 class PromptTemplate:
     """프롬프트 템플릿 클래스"""
@@ -47,7 +48,9 @@ class SystemPrompts:
         self._prompts = {}
         self._active_versions = {}  # 각 프롬프트의 현재 활성 버전
         self._yaml_path = "prompt_templates.yaml"  # YAML 파일 경로
-        self._last_updated = datetime.now()
+        self._last_modified_time = 0  # 파일 마지막 수정 시간
+        self._last_checked_time = 0   # 파일 마지막 확인 시간
+        self._check_interval = 5      # 파일 변경 확인 간격(초)
 
         # YAML 파일 로드
         self._load_from_yaml()
@@ -56,6 +59,9 @@ class SystemPrompts:
         """YAML 파일에서 프롬프트 로드"""
         try:
             if os.path.exists(self._yaml_path):
+                # 파일 수정 시간 업데이트
+                self._last_modified_time = os.path.getmtime(self._yaml_path)
+                
                 with open(self._yaml_path, 'r', encoding='utf-8') as f:
                     data = yaml.safe_load(f)
                 
@@ -70,21 +76,27 @@ class SystemPrompts:
                 # 프롬프트 로드
                 prompt_versions = data.get("prompt_versions", {})
                 
-                # 프롬프트 객체 생성
+                # 임시 저장소 - 새 프롬프트 생성용
+                new_prompts = {}
+                
+                # 설명 및 변수 정보
                 descriptions = {
                     "GRADER": "검색된 문서의 의료 관련성 평가",
                     "RAG": "의료 전문가용 상세 RAG 응답 생성",
                     "HALLUCINATION": "생성된 의료 정보의 철저한 환각 평가",
                     "REWRITER": "의료 검색 최적화 질문 재작성",
                     "INTEGRATOR": "다중 소스 의료 정보 통합 및 인용",
+                    "REASONINGINTEGRATOR": "정보 통합 및 논리 회로 점검",
                     "MEMORY": "의료 대화 요약 및 메모리 관리",
-                    "MEDGEMMA": "의료 전문가용 상세 응답을 위한 MedGemma 프롬프트"
+                    "MEDGEMMA": "의료 전문가용 상세 응답을 위한 MedGemma 프롬프트",
+                    "OUTPUT_FORMATTER": "의료 정보의 임상 최적화 포맷팅"
                 }
                 
                 variables = {
                     "MEMORY": ["language"],
-                    "MEDGEMMA": ["query"],
-                    "INTEGRATOR": ["pubmed_weight", "bedrock_weight", "local_weight", "s3_weight", "medgemma_weight", "web_weight"]
+                    "MEDGEMMA": ["query", "specialty"],  # specialty 변수 추가됨
+                    "INTEGRATOR": ["pubmed_weight", "bedrock_weight", "rag_weight", "web_weight", "medgemma_weight"],
+                    "OUTPUT_FORMATTER": ["integrated_content", "urgency_level", "device_type", "clinical_setting", "specialty_context", "time_constraints"]
                 }
                 
                 # 각 프롬프트 생성
@@ -93,12 +105,15 @@ class SystemPrompts:
                     content = prompt_versions.get(version_key, "")
                     
                     if content:
-                        self._prompts[prompt_name] = PromptTemplate(
+                        new_prompts[prompt_name] = PromptTemplate(
                             content=content,
                             version=version,
                             description=descriptions.get(prompt_name, ""),
                             variables=variables.get(prompt_name, [])
                         )
+                
+                # 프롬프트 교체
+                self._prompts = new_prompts
                 
                 print(f"✅ {len(self._prompts)} 프롬프트를 YAML에서 로드했습니다")
             else:
@@ -108,6 +123,48 @@ class SystemPrompts:
             print(f"❌ YAML 로드 오류: {str(e)}")
             self._initialize_default_prompts()
     
+    def reload_prompts(self) -> int:
+        """
+        YAML 파일에서 프롬프트를 다시 로드
+        
+        Returns:
+            로드된 프롬프트 수
+        """
+        print("🔄 프롬프트 재로드 중...")
+        prev_count = len(self._prompts)
+        self._load_from_yaml()
+        new_count = len(self._prompts)
+        print(f"✅ {new_count}개 프롬프트 재로드 완료")
+        return new_count
+    
+    def check_for_changes(self, force: bool = False) -> bool:
+        """
+        YAML 파일의 변경사항 확인 및 필요시 재로드
+        
+        Args:
+            force: 시간 간격과 무관하게 강제 확인
+            
+        Returns:
+            변경 감지 여부
+        """
+        current_time = time.time()
+        
+        # 마지막 확인 후 일정 시간이 지났거나 강제 확인인 경우
+        if force or (current_time - self._last_checked_time >= self._check_interval):
+            self._last_checked_time = current_time
+            
+            if os.path.exists(self._yaml_path):
+                modified_time = os.path.getmtime(self._yaml_path)
+                
+                # 파일이 수정된 경우
+                if modified_time > self._last_modified_time:
+                    print(f"📝 YAML 파일 변경 감지 ({datetime.fromtimestamp(modified_time).strftime('%Y-%m-%d %H:%M:%S')})")
+                    self.reload_prompts()
+                    self._last_modified_time = modified_time
+                    return True
+        
+        return False
+
     def _save_to_yaml(self):
         """프롬프트 내용을 YAML 파일로 저장"""
         try:
@@ -127,9 +184,13 @@ class SystemPrompts:
             with open(self._yaml_path, 'w', encoding='utf-8') as f:
                 yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
             
+            # 수정 시간 업데이트
+            self._last_modified_time = os.path.getmtime(self._yaml_path)
+            
             print(f"✅ 프롬프트 내용을 YAML 파일에 저장했습니다: {self._yaml_path}")
         except Exception as e:
             print(f"❌ YAML 저장 오류: {str(e)}")
+
 
     def _initialize_default_prompts(self):
         """기본 프롬프트 초기화"""
@@ -371,14 +432,238 @@ class SystemPrompts:
         QUERY: {query}
 
         RESPONSE:""",
-            version="2.0",
+            version="1.0",
             description="의료 전문가용 상세 응답을 위한 MedGemma 프롬프트",
             variables=["query"]
         )
+        self._prompts["OUTPUT_FORMATTER"] = PromptTemplate(
+        content="""
+        You are ClinicalOutputFormatter 1.0, an advanced medical information presentation system designed to transform comprehensive medical data into instantly actionable clinical decision support formats optimized for various healthcare settings and devices.
 
+            CONTEXT INPUTS:
+            - Raw integrated medical information: {integrated_content}
+            - Query urgency level: {emergency/urgent/routine/preventive}
+            - User device type: {desktop/tablet/mobile/print}
+            - Clinical setting: {emergency/ICU/ward/outpatient/telemedicine}
+            - User specialty: {specialty_context}
+            - Time constraints: {immediate/standard/educational}
+
+            ADAPTIVE FORMATTING FRAMEWORK:
+
+            **[1. URGENCY-BASED INFORMATION ARCHITECTURE]**
+
+            🚨 EMERGENCY/STAT (Immediate Action Required):
+            ┌─── CRITICAL ACTIONS ─── ⏱️ <5 min ───┐
+            │ 1. [Immediate intervention]           │
+            │ 2. [Life-saving medication + dose]   │
+            │ 3. [Critical monitoring parameters]   │
+            └──────────────────────────────────────┘
+            ⚠️ CONTRAINDICATIONS: [Absolute contraindications in RED]
+            💊 DRUG DOSING: [Weight-based calculation provided]
+            📞 CONSULT: [When to call specialist - specific triggers]
+
+            🔶 URGENT (Action within hours):
+            IMMEDIATE ASSESSMENT:
+            □ [Critical exam findings to check]
+            □ [Must-have lab tests]
+            □ [Imaging if indicated]
+            TREATMENT PROTOCOL:
+            → First-line: [Drug/dose/route/frequency]
+            → Alternative: [If contraindicated]
+            → Monitoring: [Parameters + frequency]
+
+            🔷 ROUTINE (Standard care):
+            CLINICAL SUMMARY
+            ├── Diagnosis Criteria
+            ├── Treatment Options (ranked by evidence)
+            ├── Follow-up Schedule
+            └── Patient Education Points
+
+            **[2. VISUAL HIERARCHY OPTIMIZATION]**
+
+            TYPOGRAPHY RULES:
+            - Critical warnings: 🚨 **BOLD RED** (if supported) or **【CRITICAL】**
+            - Primary actions: **Bold** with numbered steps
+            - Dosing info: `Monospace font` for precision
+            - Secondary info: Regular text
+            - De-emphasized: *Italics* for references
+
+            INFORMATION DENSITY ZONES:
+            [HIGH PRIORITY ZONE - Top 20%]
+            Critical actions, warnings, primary diagnosis
+            [QUICK REFERENCE ZONE - Middle 60%]
+            Treatment protocols, dosing tables, algorithms
+            [DETAILED REFERENCE ZONE - Bottom 20%]
+            Pathophysiology, evidence, references
+
+            **[3. CLINICAL DECISION SUPPORT TOOLS]**
+
+            A. DOSING CALCULATORS (Auto-formatted):
+            ┌─────────────────────────────────────┐
+            │ MEDICATION: [Drug Name]             │
+            ├─────────────────────────────────────┤
+            │ Adult: [X] mg/kg × ___kg = ___mg   │
+            │ Peds: [Y] mg/kg × ___kg = ___mg    │
+            │ Max dose: [Z] mg/day                │
+            │ Renal adjustment: CrCl <30: [%]     │
+            └─────────────────────────────────────┘
+
+            B. DECISION TREES (Visual):
+            Patient Presentation
+            ├─→ Criteria A met?
+            │     ├─→ YES: Treatment 1
+            │     └─→ NO: Go to Criteria B
+            └─→ Criteria B met?
+            ├─→ YES: Treatment 2
+            └─→ NO: Consider differential
+
+            C. QUICK REFERENCE CARDS:
+            ╔═══════════════════════════════════╗
+            ║ CONDITION: [Name]    ICD: [Code]  ║
+            ╠═══════════════════════════════════╣
+            ║ 🎯 Key Dx: [1-2 pathognomonic]    ║
+            ║ 💊 1st Line: [Drug + dose]        ║
+            ║ ⏱️ Duration: [Specific]           ║
+            ║ 🚫 Avoid: [Contraindications]     ║
+            ║ 📊 Monitor: [Labs + frequency]    ║
+            ╚═══════════════════════════════════╝
+
+            **[4. DEVICE-SPECIFIC OPTIMIZATION]**
+
+            DESKTOP (Full View):
+            - Multi-column layout for comparisons
+            - Expandable sections for details
+            - Comprehensive tables with sorting
+            - Full decision algorithms
+
+            TABLET (Hybrid View):
+            - Single column with collapsible sections
+            - Swipeable reference cards
+            - Touch-optimized interaction zones
+            - Simplified algorithms
+
+            MOBILE (Essential View):
+            - Critical info only above fold
+            - Stackable cards interface
+            - Large touch targets for actions
+            - Emergency protocols prioritized
+
+            PRINT (Static Reference):
+            - Black/white optimized
+            - Page break logic for sections
+            - QR codes for updates
+            - Checkbox lists for protocols
+
+            **[5. SMART CONTENT ORGANIZATION]**
+
+            CLINICAL PEARLS BOX:
+            💡 CLINICAL PEARLS:
+            • [Non-obvious but crucial point]
+            • [Common pitfall to avoid]
+            • [Time-saving tip]
+
+            SAFETY CHECKLIST:
+            ✓ BEFORE ADMINISTERING:
+            □ Check allergies
+            □ Verify dose calculation
+            □ Confirm no contraindications
+            □ Review interactions
+
+            EVIDENCE STRENGTH INDICATORS:
+            ⬛⬛⬛⬛⬛ Strong recommendation, high-quality evidence
+            ⬛⬛⬛⬛⬜ Strong recommendation, moderate-quality evidence  
+            ⬛⬛⬛⬜⬜ Conditional recommendation, moderate-quality evidence
+            ⬛⬛⬜⬜⬜ Conditional recommendation, low-quality evidence
+            ⬛⬜⬜⬜⬜ Expert opinion only
+
+            **[6. INTERACTIVE ELEMENTS]**
+
+            COLLAPSIBLE SECTIONS:
+            ▶ Pathophysiology [Click to expand]
+            ▶ Detailed pharmacokinetics
+            ▶ Special populations
+            ▶ References
+
+            COPY-READY FORMATS:
+            📋 ORDERS (Copy-friendly):
+
+            Amoxicillin 500mg PO TID x 7 days
+            CBC, BMP, LFTs stat
+            CXR PA/lateral
+            Vital signs q4h
+
+
+            **[7. QUALITY ENHANCEMENT FEATURES]**
+
+            TEMPORAL AWARENESS:
+            ⏰ TIME-SENSITIVE:
+            • Door-to-needle: <60 min
+            • Golden hour ends: [calculated time]
+            • Next dose due: [specific time]
+
+            HANDOFF OPTIMIZATION:
+            📋 HANDOFF SUMMARY:
+            Dx: [Primary diagnosis]
+            Tx: [Current treatment]
+            Pending: [Tests/consults]
+            Watch: [Complications]
+            Plan: [Next 24h actions]
+
+            **[8. ACCESSIBILITY COMPLIANCE]**
+
+            - High contrast mode available
+            - Screen reader friendly structure
+            - Keyboard navigation support
+            - Font size scaling capability
+            - Color-blind safe indicators
+
+            **[9. OUTPUT STRUCTURE TEMPLATES]**
+
+            Template Selection Logic:
+            1. If emergency + mobile → Ultra-compact critical info
+            2. If routine + desktop → Comprehensive reference
+            3. If education + tablet → Interactive learning modules
+            4. If handoff + any → Standardized SBAR format
+
+            **[10. FINAL FORMATTING RULES]**
+
+            MUST INCLUDE:
+            ✓ Primary clinical question answered first
+            ✓ Safety warnings prominently displayed
+            ✓ Dosing with calculations shown
+            ✓ Clear next steps/actions
+            ✓ Evidence level for recommendations
+
+            MUST AVOID:
+            ✗ Walls of unformatted text
+            ✗ Burying critical info in paragraphs
+            ✗ Ambiguous action items
+            ✗ Missing temporal elements
+            ✗ Unclear hierarchies
+
+            PERFORMANCE METRICS:
+            - Time to find critical info: <3 seconds
+            - Cognitive load score: Minimized
+            - Action clarity: 100%
+            - Safety prominence: Maximum
+            - Evidence transparency: Clear
+
+            LANGUAGE HANDLING:
+            Maintain the same language as the source content.
+            For Korean: Use appropriate medical Hangul + Hanja when needed.
+            For English: Use standard medical terminology.
+
+            Transform the medical information into the optimal format based on all context factors above.""",
+            version="1.0",
+            description="의료 정보의 임상 최적화 포맷팅",
+            variables=["integrated_content", "urgency_level", "device_type", "clinical_setting", "specialty_context", "time_constraints"]
+        )
+
+
+    
     def get(self, prompt_name: str) -> str:
         """
-        프롬프트 내용 조회
+        프롬프트 내용 조회 (변경 감지 포함)
         
         Args:
             prompt_name: 프롬프트 이름 (ROUTER, GRADER 등)
@@ -386,13 +671,16 @@ class SystemPrompts:
         Returns:
             프롬프트 내용
         """
+        # 변경 확인
+        self.check_for_changes()
+        
         if prompt_name in self._prompts:
             return self._prompts[prompt_name].content
         return None
     
     def format(self, prompt_name: str, **kwargs) -> str:
         """
-        템플릿 변수를 적용한 프롬프트 생성
+        템플릿 변수를 적용한 프롬프트 생성 (변경 감지 포함)
         
         Args:
             prompt_name: 프롬프트 이름
@@ -401,13 +689,16 @@ class SystemPrompts:
         Returns:
             포맷된 프롬프트
         """
+        # 변경 확인
+        self.check_for_changes()
+        
         if prompt_name in self._prompts:
             return self._prompts[prompt_name].format(**kwargs)
         return None
     
     def update(self, prompt_name: str, content: str, version: str = None) -> bool:
         """
-        프롬프트 내용 업데이트
+        프롬프트 내용 업데이트 (변경 감지 포함)
         
         Args:
             prompt_name: 프롬프트 이름
@@ -417,6 +708,9 @@ class SystemPrompts:
         Returns:
             성공 여부
         """
+        # 변경 확인
+        self.check_for_changes()
+        
         if prompt_name in self._prompts:
             old_version = self._prompts[prompt_name].version
             
@@ -425,7 +719,6 @@ class SystemPrompts:
                 self._prompts[prompt_name].version = version
             
             self._prompts[prompt_name].content = content
-            self._last_updated = datetime.now()
             
             # 버전 변경 시 활성 버전 업데이트
             if version and old_version != version:
@@ -440,7 +733,7 @@ class SystemPrompts:
     
     def create_version(self, prompt_name: str, new_version: str, content: str = None) -> bool:
         """
-        기존 프롬프트의 새 버전 생성
+        기존 프롬프트의 새 버전 생성 (변경 감지 포함)
         
         Args:
             prompt_name: 프롬프트 이름
@@ -450,6 +743,9 @@ class SystemPrompts:
         Returns:
             성공 여부
         """
+        # 변경 확인
+        self.check_for_changes()
+        
         if prompt_name not in self._prompts:
             print(f"❌ 프롬프트 '{prompt_name}'가 존재하지 않습니다")
             return False
@@ -477,6 +773,9 @@ class SystemPrompts:
             with open(self._yaml_path, 'w', encoding='utf-8') as f:
                 yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
             
+            # 수정 시간 업데이트
+            self._last_modified_time = os.path.getmtime(self._yaml_path)
+            
             print(f"✅ 프롬프트 '{prompt_name}' 버전 {new_version} 생성 완료")
             return True
             
@@ -486,7 +785,7 @@ class SystemPrompts:
     
     def switch_version(self, prompt_name: str, version: str) -> bool:
         """
-        프롬프트의 활성 버전 변경
+        프롬프트의 활성 버전 변경 (변경 감지 포함)
         
         Args:
             prompt_name: 프롬프트 이름
@@ -495,6 +794,9 @@ class SystemPrompts:
         Returns:
             성공 여부
         """
+        # 변경 확인
+        self.check_for_changes()
+        
         if prompt_name not in self._prompts:
             print(f"❌ 프롬프트 '{prompt_name}'가 존재하지 않습니다")
             return False
@@ -531,6 +833,9 @@ class SystemPrompts:
             with open(self._yaml_path, 'w', encoding='utf-8') as f:
                 yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
             
+            # 수정 시간 업데이트
+            self._last_modified_time = os.path.getmtime(self._yaml_path)
+            
             print(f"✅ 프롬프트 '{prompt_name}' 버전 {version}으로 전환 완료")
             return True
             
@@ -540,7 +845,7 @@ class SystemPrompts:
     
     def get_prompt_versions(self, prompt_name: str) -> List[str]:
         """
-        프롬프트의 사용 가능한 모든 버전 조회
+        프롬프트의 사용 가능한 모든 버전 조회 (변경 감지 포함)
         
         Args:
             prompt_name: 프롬프트 이름
@@ -548,6 +853,9 @@ class SystemPrompts:
         Returns:
             버전 목록
         """
+        # 변경 확인
+        self.check_for_changes()
+        
         if prompt_name not in self._prompts:
             return []
         
@@ -573,6 +881,17 @@ class SystemPrompts:
             versions.append(current_version)
         
         return sorted(versions)
+    
+    def set_check_interval(self, seconds: int) -> None:
+        """
+        파일 변경 확인 간격 설정
+        
+        Args:
+            seconds: 확인 간격(초)
+        """
+        self._check_interval = max(1, seconds)  # 최소 1초
+        print(f"✅ 파일 변경 확인 간격을 {self._check_interval}초로 설정")
+
     
     # 기존 메서드들 유지
     def list_prompts(self) -> Dict[str, Dict[str, Any]]:
@@ -609,6 +928,7 @@ class SystemPrompts:
         """마지막 업데이트 시간 반환"""
         return self._last_updated
 
+
 # 싱글톤 인스턴스 생성
 system_prompts = SystemPrompts()
 
@@ -625,8 +945,15 @@ def get_prompt_versions(prompt_name: str) -> List[str]:
     """프롬프트의 사용 가능한 버전 목록 조회"""
     return system_prompts.get_prompt_versions(prompt_name)
 
+def reload_prompts() -> int:
+    """모든 프롬프트 재로드"""
+    return system_prompts.reload_prompts()
+
 def get_all_prompt_info() -> Dict[str, Any]:
     """모든 프롬프트 및 버전 정보 조회"""
+    # 변경 확인
+    system_prompts.check_for_changes()
+    
     info = {}
     for name, prompt_info in system_prompts.list_prompts().items():
         versions = get_prompt_versions(name)
@@ -641,14 +968,15 @@ def get_all_prompt_info() -> Dict[str, Any]:
     
     return info
 
-
 if __name__ == "__main__":
     import argparse
-    
     def main():
         """프롬프트 관리 CLI"""
         print("🔤 의료 챗봇 프롬프트 관리 도구")
         print("=" * 50)
+        
+        # 파일 변경 확인 (명시적 호출)
+        system_prompts.check_for_changes(force=True)
         
         # 사용 가능한 프롬프트 표시
         prompts_info = system_prompts.list_prompts()
@@ -671,9 +999,11 @@ if __name__ == "__main__":
             print("2. 프롬프트 버전 전환")
             print("3. 새 프롬프트 버전 생성")
             print("4. 프롬프트 테스트")
-            print("5. 종료")
+            print("5. YAML 파일 재로드")  
+            print("6. 변경 확인 간격 설정") 
+            print("7. 종료")
             
-            choice = input("\n명령어 선택 (1-5): ").strip()
+            choice = input("\n명령어 선택 (1-7): ").strip()
             
             if choice == "1":
                 # 프롬프트 보기
@@ -783,10 +1113,21 @@ if __name__ == "__main__":
                     print(formatted)
             
             elif choice == "5":
+                # YAML 파일 재로드
+                count = system_prompts.reload_prompts()
+                print(f"✅ {count}개 프롬프트가 재로드되었습니다.")
+            
+            elif choice == "6":
+                # 변경 확인 간격 설정
+                try:
+                    seconds = int(input("확인 간격(초) 입력: ").strip())
+                    system_prompts.set_check_interval(seconds)
+                except ValueError:
+                    print("❌ 올바른 숫자를 입력하세요.")
+            
+            elif choice == "7":
                 print("👋 프롬프트 관리 도구를 종료합니다.")
                 break
             
-            else:
-                print("❌ 잘못된 선택입니다. 1-5 사이의 숫자를 입력하세요.")
     
     main()

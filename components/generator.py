@@ -21,10 +21,14 @@ class Generator:
         ])
         self.rag_chain = self.rag_prompt | self.llm | StrOutputParser()
         
-        # 질문 재작성 체인
+        # 질문 재작성 체인 - REWRITER 프롬프트에 맞게 수정
+        rewriter_prompt_content = system_prompts.get("REWRITER")
+        
+        # REWRITER는 시스템 프롬프트 내에 이미 지시사항이 포함되어 있음
+        # Human 메시지는 단순히 질문만 전달
         self.re_write_prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompts.get("REWRITER")),
-            ("human", "Here is the initial question: \n\n {question} \n Formulate an improved question."),
+            ("system", rewriter_prompt_content),
+            ("human", "{question}"),
         ])
         self.question_rewriter = self.re_write_prompt | self.llm | StrOutputParser()
     
@@ -55,9 +59,19 @@ class Generator:
         return generation
     
     def rewrite_question(self, question: str) -> str:
-        """쿼리를 재작성합니다."""
+        """의료 검색에 최적화된 쿼리로 재작성합니다."""
         print("==== [TRANSFORM QUERY] ====")
-        better_question = self.question_rewriter.invoke({"question": question})
-        print(f"원래 질문: {question}")
-        print(f"재작성된 질문: {better_question}")
-        return better_question
+        
+        try:
+            # REWRITER 프롬프트는 {question}만 필요
+            better_question = self.question_rewriter.invoke({"question": question})
+            
+            print(f"  원래 질문: {question}")
+            print(f"  최적화된 검색 쿼리: {better_question}")
+            
+            return better_question
+        
+        except Exception as e:
+            print(f"  ❌ 질문 재작성 실패: {str(e)}")
+            # 실패 시 원래 질문 반환
+            return question

@@ -8,8 +8,11 @@ from langgraph.checkpoint.memory import MemorySaver
 import uuid
 import os
 from datetime import datetime
+import langdetect
+from langdetect import detect, detect_langs
     
 from config import Config
+#from question_logger import QuestionLogger
 from components.local_retriever import LocalRetriever
 from components.pubMed_searcher import PubMedSearcher
 from components.evaluator import Evaluator
@@ -57,6 +60,11 @@ class GraphState(BaseModel):
 
     original_question: Optional[str] = None
 
+    input_language: str = ""              # 감지된 입력 언어
+    target_language: str = "korean"       # 목표 출력 언어
+    language_confidence: float = 0.0      # 언어 감지 신뢰도
+    language_context: Dict[str, Any] = {} # 추가 언어 메타데이터
+
 class RAGSystem:
     """리팩토링된 의료 RAG 시스템"""
     
@@ -68,8 +76,14 @@ class RAGSystem:
         self.evaluator = Evaluator(self.llm)
         self.generator = Generator(self.llm)
         self.integrator = Integrator(self.llm)
-        self.output_formatter = OutputFormatter()
+        self.output_formatter = OutputFormatter(self.llm)
         self.memory_manager = MemoryManager(self.llm)
+
+        # PubMed 검색기 초기화
+        self.pubmed_searcher = None
+        if self.config.SEARCH_SOURCES_CONFIG.get("pubmed", False):
+            self.pubmed_searcher = PubMedSearcher()
+            print("✅ PubMed 검색기 초기화 완료")
 
         # 로컬 검색기 초기화
         self.local_retriever = None
@@ -78,11 +92,6 @@ class RAGSystem:
             self.local_retriever.set_local_search_enabled(True)
             print("✅ 로컬 검색기 초기화 완료")
 
-        # PubMed 검색기 초기화
-        self.pubmed_searcher = None
-        if self.config.SEARCH_SOURCES_CONFIG.get("pubmed", False):
-            self.pubmed_searcher = PubMedSearcher()
-            print("✅ PubMed 검색기 초기화 완료")
         
         # S3 검색기 초기화
         self.s3_retriever = None
@@ -160,6 +169,7 @@ class RAGSystem:
         self.workflow.add_node("parallel_search", self._parallel_search)
         self.workflow.add_node("integrate_answers", self._integrate_answers)
         self.workflow.add_node("hallucination_check", self._hallucination_check)
+        self.workflow.add_node("rewrite_question", self._rewrite_question)
         self.workflow.add_node("format_output", self._format_output)
 
         # 엣지 설정
@@ -171,7 +181,7 @@ class RAGSystem:
         self.workflow.add_conditional_edges(
             "hallucination_check",
             self._get_hallucination_decision,
-            {"hallucination": "integrate_answers", "relevant": "format_output"} 
+            {"hallucination": "rewrite_question", "relevant": "format_output"} 
         )
         
         self.workflow.add_edge("format_output", END)
@@ -187,44 +197,36 @@ class RAGSystem:
         original_question = state.question
         current_history = state.conversation_history or []
 
-        # 1단계: 메모리 관리
+        lang_info = self._detect_language_with_confidence(original_question)
+        print(f"  🌐 감지된 언어: {lang_info['language']} (신뢰도: {lang_info['confidence']:.2f})")
+
+        # 메모리 관리
         managed_history = self.memory_manager.manage_conversation_memory(current_history)
         
-        # 2단계: 맥락 기반 질문 재생성 (이전 대화가 있으면 무조건 실행)
+        # 맥락 기반 질문 재생성
         enhanced_question = self.memory_manager.enhance_question_with_context(
             managed_history, original_question
         )
         
-        # 3단계: 대화 이력에 원래 질문 추가
+        # 대화 이력에 원래 질문 추가
         managed_history.append({
             "role": "user",
             "content": original_question,
             "timestamp": datetime.now().isoformat(),
-            "enhanced_question": enhanced_question if enhanced_question != original_question else None
+            "enhanced_question": enhanced_question if enhanced_question != original_question else None,
+            "language": lang_info['language'],
+            "language_confidence": lang_info['confidence']
         })
         
         return {
             "conversation_history": managed_history,
             "question": enhanced_question,  # 재생성된 질문으로 검색/답변
-            "original_question": original_question
+            "original_question": original_question,
+            "input_language": lang_info['language'],  
+            "language_confidence": lang_info['confidence'],
+            "target_language": state.target_language or "korean"  # 기본값 설정
         }
     
-    def _retrieve(self, state: GraphState) -> Dict[str, Any]:
-        """벡터 검색 (유사도 임계값 적용)"""
-        print("==== [VECTOR RETRIEVE] ====")
-        documents = self.local_retriever.retrieve_documents(state.question)
-        
-        # 유사도 임계값 적용
-        threshold = getattr(self.config, 'SIMILARITY_THRESHOLD', 0.7)
-        filtered_docs = []
-        
-        for doc in documents:
-            similarity = doc.metadata.get("similarity_score", 0.0)
-            if similarity >= threshold:
-                filtered_docs.append(doc)
-        
-        print(f"임계값({threshold}) 이상 문서: {len(filtered_docs)}개")
-        return {"documents": filtered_docs}
         
     def _parallel_search(self, state: GraphState) -> Dict[str, Any]:
         
@@ -240,10 +242,20 @@ class RAGSystem:
     
     def _integrate_answers(self, state: GraphState) -> Dict[str, Any]:
         """가중치 적용 답변 통합"""
-        print("==== [INTEGRATE WITH WEIGHTS] ====")
+        print("==== [INTEGRATE ANSWERS] ====")
         
+        # 언어 정보 확인
+        input_lang = state.input_language
+        target_lang = state.target_language
+        print(f"  🌐 입력 언어: {input_lang}, 목표 언어: {target_lang}")
+        
+        # 언어 정보를 integrator에 전달
+        language_instruction = f"\nIMPORTANT: Respond in {target_lang}. The user asked in {input_lang}.\n"
+        
+        # 기존 통합 로직에 언어 지시 추가
         integrated_answer = self.integrator.integrate_answers(
-            state.question, state.source_categorized_docs
+            state.question + language_instruction, 
+            state.source_categorized_docs
         )
         
         # 대화 이력 업데이트
@@ -251,6 +263,7 @@ class RAGSystem:
         history.append({
             "role": "assistant",
             "content": integrated_answer,
+            "response_language": target_lang,
             "timestamp": datetime.now().isoformat()
         })
         
@@ -291,10 +304,35 @@ class RAGSystem:
     def _get_hallucination_decision(self, state: GraphState) -> str:
         """환각 결정 반환"""
         return state.hallucination_decision
+
+    def _rewrite_question(self, state: GraphState) -> Dict[str, Any]:
+        """질문 재작성 및 재시도"""
+        print("==== [REWRITE QUESTION] ====")
+        
+        # 원래 질문 가져오기
+        original_question = state.original_question or state.question
+        
+        # 질문 재작성
+        rewritten_question = self.generator.rewrite_question(original_question)
+        
+        print(f"  원래 질문: {original_question}")
+        print(f"  재작성된 질문: {rewritten_question}")
+        
+        # 재작성된 질문으로 업데이트
+        return {"question": rewritten_question}
     
     def _format_output(self, state: GraphState) -> Dict[str, Any]:
         """최종 출력 포맷팅"""
         print("==== [FORMAT OUTPUT] ====")
+        
+        # 긴급도 감지 (질문과 답변에서)
+        urgency_level = self._detect_urgency(state.question, state.integrated_answer)
+        
+        # 디바이스 타입 (추후 확장 가능)
+        device_type = "desktop"  # 기본값, 추후 요청에서 가져올 수 있음
+        
+        # 임상 세팅
+        clinical_setting = "outpatient"  # 기본값
         
         formatted_output = self.output_formatter.format_medical_answer(
             question=state.question,
@@ -302,18 +340,53 @@ class RAGSystem:
             source_categorized_docs=state.source_categorized_docs,
             conversation_history=state.conversation_history,
             hallucination_attempts=state.rewrite_count + 1,
-            original_question=state.original_question 
+            original_question=state.original_question,
+            urgency_level=urgency_level,
+            device_type=device_type,
+            clinical_setting=clinical_setting
         )
         
         return {"final_formatted_output": formatted_output}
-    
-    def run_graph(self, question: str, user_id: str = None) -> Dict[str, Any]:
+
+    def _detect_urgency(self, question: str, answer: str) -> str:
+        """질문과 답변에서 긴급도 자동 감지"""
+        
+        emergency_patterns = [
+            "응급", "즉시", "emergency", "stat", "urgent", 
+            "생명", "위급", "critical", "immediately"
+        ]
+        
+        preventive_patterns = [
+            "예방", "검진", "screening", "prevention", "vaccine"
+        ]
+        
+        text = f"{question} {answer}".lower()
+        
+        for pattern in emergency_patterns:
+            if pattern in text:
+                return "emergency"
+        
+        for pattern in preventive_patterns:
+            if pattern in text:
+                return "preventive"
+        
+        # 추가 로직으로 urgent 감지
+        if any(word in text for word in ["빠른", "신속", "곧", "soon"]):
+            return "urgent"
+        
+        return "routine"
+        
+    def run_graph(self, question: str, user_id: str = None, target_language: str = "korean") -> Dict[str, Any]:
         """그래프 실행 (기존 인터페이스 유지)"""
         if not user_id:
             user_id = str(uuid.uuid4())
         
-        initial_state = GraphState(question=question, user_id=user_id)
-        
+        initial_state = GraphState(
+            question=question, 
+            user_id=user_id,
+            target_language=target_language  # 사용자가 원하는 출력 언어
+        )
+    
         config = {
             "configurable": {"thread_id": user_id},
             "recursion_limit": self.config.RECURSION_LIMIT
@@ -336,7 +409,8 @@ class RAGSystem:
         initial_state = GraphState(
             question=question,
             user_id=user_id,
-            conversation_history=existing_history
+            conversation_history=existing_history,
+            target_language=target_language
         )
         
         # 그래프 실행
@@ -346,6 +420,15 @@ class RAGSystem:
         if "final_formatted_output" in result and result["final_formatted_output"]:
             formatted_output = result["final_formatted_output"]
             display_answer = self.output_formatter.format_for_display(formatted_output)
+
+            # 질문 로깅
+            #self._log_question_data(
+            #    question, 
+            #    user_id, 
+            #    config.get('configurable', {}).get('thread_id', ''),
+            #    display_answer,
+            #    result
+            #)
             
             return {
                 "answer": display_answer,
@@ -353,19 +436,34 @@ class RAGSystem:
                 "formatted_output": formatted_output,
                 "user_id": user_id,
                 "conversation_history": result.get("conversation_history", []),
-                "source_breakdown": result.get("source_categorized_docs", {})
+                "source_breakdown": result.get("source_categorized_docs", {}),
+                # 언어 정보 추가
+                "language_info": {
+                    "input_language": result.get("input_language", "unknown"),
+                    "target_language": result.get("target_language", "korean"),
+                    "confidence": result.get("language_confidence", 0.0),
+                    "consistency": result.get("language_context", {}).get("consistency_score", 0.0)
+                }
             }
         else:
+            # 질문 로깅 (답변 실패 케이스)
+            #self._log_question_data(
+            #    question, 
+            #    user_id, 
+            #    config.get('configurable', {}).get('thread_id', ''),
+            #    display_answer,
+            #    result
+            #)
             return {
                 "answer": result["generation"] if "generation" in result else "답변을 생성할 수 없습니다.",
                 "user_id": user_id,
-                "conversation_history": result.get("conversation_history", [])
+                "conversation_history": result.get("conversation_history", []),
+                "language_info": {
+                    "input_language": result.get("input_language", "unknown"),
+                    "target_language": result.get("target_language", "korean")
+                }
             }
-    
-    def load_medical_documents(self, directory_path: str) -> int:
-        """의료 문서 로드 (편의 메서드)"""
-        return self.retriever.load_documents_from_directory(directory_path)
-    
+
     def refresh_components(self):
         """
         컴포넌트를 새로고침하여 업데이트된 프롬프트 적용
@@ -377,14 +475,19 @@ class RAGSystem:
             self.evaluator = Evaluator(self.llm)
             self.generator = Generator(self.llm)
             self.integrator = Integrator(self.llm)
+            self.output_formatter = OutputFormatter(self.llm)
             self.memory_manager = MemoryManager(self.llm)
+            
+            # MedGemma 검색기 재초기화 
+            if self.config.SEARCH_SOURCES_CONFIG.get("medgemma", False) and hasattr(self, 'medgemma_searcher'):
+                self.medgemma_searcher = MedGemmaSearcher()
             
             print("  ✅ 컴포넌트 새로고침 완료")
             return True
         except Exception as e:
             print(f"  ❌ 컴포넌트 새로고침 실패: {str(e)}")
             return False
-
+        
     def get_stats(self) -> Dict[str, Any]:
         """시스템 통계"""
         retriever_stats = self.local_retriever.get_stats()
@@ -414,6 +517,103 @@ class RAGSystem:
         }
         
         return status
+    
+    def _detect_language_with_confidence(self, text: str) -> Dict[str, Any]:
+        """텍스트의 언어를 감지하고 신뢰도와 함께 반환"""
+        try:
+            # 기본 언어 감지
+            detected_lang = detect(text)
+            
+            # 신뢰도 포함 감지
+            lang_probs = detect_langs(text)
+            confidence = lang_probs[0].prob if lang_probs else 0.0
+            
+            # 언어 코드를 읽기 쉬운 이름으로 변환
+            language_names = {
+                'ko': 'korean',
+                'en': 'english',
+                'ja': 'japanese',
+                'zh-cn': 'chinese',
+                'vi': 'vietnamese',
+                'th': 'thai'
+            }
+            
+            language_name = language_names.get(detected_lang, detected_lang)
+            
+            return {
+                'language': language_name,
+                'language_code': detected_lang,
+                'confidence': confidence,
+                'all_probabilities': [(lang.lang, lang.prob) for lang in lang_probs]
+            }
+        
+        except Exception as e:
+            print(f"언어 감지 오류: {str(e)}")
+            # 오류 시 기본값 반환
+            return {
+                'language': 'korean',  # 기본값
+                'language_code': 'ko',
+                'confidence': 0.0,
+                'error': str(e)
+            }
+
+    def _check_language_consistency(self, state: GraphState) -> Dict[str, Any]:
+        """각 단계에서 언어 일관성 체크 (디버깅용)"""
+        checks = {
+            "input_language": state.input_language,
+            "target_language": state.target_language,
+            "question_language": self._detect_language_with_confidence(state.question)['language'],
+        }
+        
+        # 생성된 답변이 있으면 언어 체크
+        if state.generation:
+            checks["generation_language"] = self._detect_language_with_confidence(state.generation)['language']
+        
+        if state.integrated_answer:
+            checks["integrated_answer_language"] = self._detect_language_with_confidence(state.integrated_answer)['language']
+    
+        # 일관성 점수 계산
+        consistency_score = 1.0
+        if checks.get("generation_language") and checks["generation_language"] != state.target_language:
+            consistency_score -= 0.5
+        
+        print(f"  🔍 언어 일관성 체크: {checks}")
+        print(f"  📊 일관성 점수: {consistency_score}")
+        
+        return {
+            "language_context": {
+                **state.language_context,
+                "consistency_checks": checks,
+                "consistency_score": consistency_score
+            }
+        }
+
+    def _log_question_data(self, question: str, user_id: str, session_id: str, answer: str, result: Dict[str, Any]) -> None:
+        """질문 데이터 로깅"""
+        try:
+            # 메타데이터 구성
+            metadata = {
+                "rewrite_count": result.get("rewrite_count", 0),
+                "hallucination_decision": result.get("hallucination_decision", ""),
+                "routing_decision": result.get("routing_decision", ""),
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # 사용된 소스 목록
+            sources_used = list(result.get("source_categorized_docs", {}).keys())
+            
+            # 로깅 실행
+            #self.question_logger.log_question(
+            #    question=question,
+            #    user_id=user_id,
+            #    session_id=session_id,
+            #    answer=answer,
+            #    sources_used=sources_used,
+            #    metadata=metadata
+            #)
+            
+        except Exception as e:
+            print(f"⚠️ 질문 로깅 중 오류 발생: {str(e)}")
 
     def refresh_components(self):
         """프롬프트 변경 후 컴포넌트 재초기화"""

@@ -5,7 +5,6 @@ from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
 from prompts import system_prompts
 
-
 class GradeDocuments(BaseModel):
     """Binary score for relevance check on retrieved documents."""
     binary_score: str = Field(
@@ -89,10 +88,10 @@ class Evaluator:
             grade = score.binary_score.lower()
             
             if grade == "yes":
-                print("==== [DECISION: ANSWER IS GROUNDED IN DOCUMENTS] ====")
+                print("==== [DECISION: Relevant] ====")
                 return "relevant"
             else:
-                print("==== [DECISION: HALLUCINATION DETECTED] ====")
+                print("==== [DECISION: Hallucination] ====")
                 return "hallucination"
                 
         except Exception as e:

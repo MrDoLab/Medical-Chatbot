@@ -85,8 +85,11 @@ def main():
                     print(f"\n🏥 답변:\n{result}")
                 
             except Exception as e:
-                print(f"❌ 답변 생성 실패: {e}")
+                error_trace = traceback.format_exc()
+                print(f"❌ 답변 생성 실패: {str(e)}\n\n상세 오류:\n{error_trace}")
                 print("💡 시스템 문제가 있을 수 있습니다")
+                
+        print(result["language_info"])
     
     except KeyboardInterrupt:
         print("\n👋 사용자가 종료했습니다.")

@@ -145,13 +145,23 @@ class PubMedSearcher:
             pmid_elem = article.find(".//PMID")
             pmid = pmid_elem.text if pmid_elem is not None else "ID 없음"
             
+            # DOI
+            doi = ""
+            article_id_list = article.find(".//ArticleIdList")
+            if article_id_list is not None:
+                for id_elem in article_id_list.findall("ArticleId"):
+                    if id_elem.get("IdType") == "doi":
+                        doi = id_elem.text
+                        break
+
             return {
                 "title": title,
                 "abstract": abstract,
                 "authors": authors,
                 "year": year,
                 "journal": journal_name,
-                "pmid": pmid
+                "pmid": pmid,
+                "doi": doi
             }
             
         except Exception as e:
@@ -186,10 +196,51 @@ class PubMedSearcher:
                 "reliability": "high"  # PubMed는 기본적으로 높은 신뢰도
             }
             
+    def _convert_to_documents(self, papers: List[Dict]) -> List[Document]:
+        """논문 정보를 Document 객체로 변환합니다"""
+        documents = []
+        
+        for paper in papers:
+            # 논문 내용 구성
+            content_parts = [
+                f"제목: {paper['title']}",
+                f"초록: {paper['abstract']}",
+                f"저자: {', '.join(paper['authors'][:3])}{'...' if len(paper['authors']) > 3 else ''}",
+                f"출판년도: {paper['year']}",
+                f"저널: {paper['journal']}"
+            ]
+            
+            # PubMed URL 생성 추가
+            pmid = paper.get('pmid')
+            pubmed_url = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/" if pmid and pmid != "ID 없음" else ""
+            
+            if pubmed_url:
+                content_parts.append(f"URL: {pubmed_url}")
+            
+            content = "\n\n".join(content_parts)
+            
+            # DOI 정보 확인 (옵션)
+            doi = self._extract_doi_if_available(paper)
+            
+            # 메타데이터 구성 - URL 및 DOI 추가
+            metadata = {
+                "source": f"pubmed_{paper['pmid']}",
+                "title": paper["title"],
+                "authors": paper["authors"],
+                "year": paper["year"],
+                "journal": paper["journal"],
+                "pmid": paper["pmid"],
+                "url": pubmed_url,  # URL 추가
+                "doi": doi,         # DOI 추가 (있는 경우)
+                "source_type": "pubmed",
+                "reliability": "high"  # PubMed는 기본적으로 높은 신뢰도
+            }
+            
             document = Document(page_content=content, metadata=metadata)
             documents.append(document)
         
-        return documents
+        return documents            
+            
     
     def _optimize_medical_query(self, query: str) -> str:
         """의료 검색을 위한 쿼리 최적화"""
@@ -242,3 +293,8 @@ class PubMedSearcher:
                 "note": "PubMed 검색 실패로 인한 기본 정보"
             }
         )]
+
+    def _extract_doi_if_available(self, paper: Dict) -> str:
+        """논문 정보에서 DOI를 추출합니다 (있는 경우)"""
+        # 이 메서드는 paper 딕셔너리에서 doi 필드를 찾아 반환합니다
+        return paper.get("doi", "")

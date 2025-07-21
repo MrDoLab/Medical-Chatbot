@@ -51,7 +51,7 @@ class ParallelSearcher:
 
         # 병렬 실행 설정
         self.max_workers = 6
-        self.timeout = 30  # 각 소스별 타임아웃 (초)
+        self.timeout = 120  # 각 소스별 타임아웃 (초)
         
         # 활성화된 소스 로깅
         active_sources = [source for source, enabled in self.sources_enabled.items() if enabled]
@@ -253,3 +253,68 @@ class ParallelSearcher:
                     pass
         
         return stats    
+
+    def _normalize_metadata(self, documents: List[Document], source_type: str) -> List[Document]:
+        """메타데이터 표준화 및 URL 확인"""
+        if not documents:
+            return []
+        
+        normalized_docs = []
+        
+        for doc in documents:
+            # 복사본 생성
+            new_doc = Document(
+                page_content=doc.page_content,
+                metadata=doc.metadata.copy()
+            )
+            
+            # source_type이 없는 경우 추가
+            if "source_type" not in new_doc.metadata:
+                new_doc.metadata["source_type"] = source_type
+            
+            # URL 정보 확인 및 정규화
+            self._ensure_url_in_metadata(new_doc.metadata, source_type)
+            
+            normalized_docs.append(new_doc)
+        
+        return normalized_docs
+
+    def _ensure_url_in_metadata(self, metadata: Dict[str, Any], source_type: str) -> None:
+        """메타데이터에 URL 정보가 있는지 확인하고 없으면 생성"""
+        # 이미 URL이 있는 경우 건너뜀
+        if "url" in metadata and metadata["url"]:
+            return
+        
+        # 소스 타입별 URL 생성 로직
+        if source_type == "pubmed":
+            # PubMed ID 기반 URL 생성
+            pmid = metadata.get("pmid")
+            if pmid:
+                metadata["url"] = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
+        
+        elif source_type == "bedrock_kb":
+            # S3 위치 정보 기반 URL 생성
+            s3_location = metadata.get("s3_location")
+            if s3_location and s3_location.startswith("s3://"):
+                parts = s3_location[5:].split("/", 1)
+                if len(parts) == 2:
+                    bucket, key = parts
+                    region = "us-east-1"  # 기본 리전 (실제 환경에 맞게 조정 필요)
+                    metadata["url"] = f"https://s3.console.aws.amazon.com/s3/object/{bucket}?region={region}&prefix={key}"
+        
+        elif source_type == "medgemma":
+            # MedGemma 모델 카드 URL 생성
+            model_name = metadata.get("model_name", "google/medgemma_27b_text_it")
+            if model_name:
+                metadata["url"] = f"https://huggingface.co/{model_name}"
+        
+        elif source_type == "local":
+            # 로컬 문서는 파일 경로를 URL로 간주
+            source = metadata.get("source", "")
+            if source:
+                metadata["url"] = f"file://{source}"
+        
+        # source가 이미 URL인 경우
+        source = metadata.get("source", "")
+        if not metadata.get("url") and (source.startswith("http://") or source.startswith("https://")):
+            metadata["url"] = source

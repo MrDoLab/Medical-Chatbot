@@ -9,24 +9,27 @@ load_dotenv()
 class Config:
     """RAG 시스템 설정 클래스"""
 
+    # 디버그 모드 활성화 상태
+    DEBUG_MODE = True
+
     # 검색 소스 활성화 상태
     SEARCH_SOURCES_CONFIG = {
-        "local": False,     # 로컬
-        "s3": False,       # S3 
-        "medgemma": False, # MedGemma 
-        "pubmed": True,    # PubMed 
-        "tavily": True,       # Tavily 웹 
-        "bedrock_kb": True    # AWS Bedrock Knowledge Base 
+        "local": False,        # 로컬
+        "s3": False,           # S3 
+        "medgemma": True,      # MedGemma 
+        "pubmed": True,        # PubMed 
+        "tavily": True,        # Tavily 웹 
+        "bedrock_kb": True     # AWS Bedrock Knowledge Base 
     }
 
     # 검색 소스 가중치 
     SOURCE_WEIGHTS = {
-            "pubmed": 1.0,      # 학술 논문
+            "pubmed": 0.94,      # 학술 논문
             "bedrock_kb": 0.95, # Bedrock Knowledge Base
-            "local": 0.9,       # 로컬 문서
-            "s3": 0.9,         # S3 저장 문서
-            "medgemma": 0.8,    # 의료 특화 AI
-            "tavily": 0.7       # 웹 검색
+            "local": 0.8,       # 로컬 문서
+            "s3": 0.8,          # S3 저장 문서
+            "medgemma": 0.98,    # 의료 특화 AI
+            "tavily": 0.92       # 웹 검색
         }
     
     # LLM 설정
@@ -87,29 +90,17 @@ class Config:
         ]
     }
 
+    # HuggingFace 관련 설정 추가
+    HF_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
+    HF_INFERENCE_ENDPOINT = os.getenv("HF_INFERENCE_ENDPOINT")
+
     # MedGemma 설정
     MEDGEMMA_CONFIG = {
-        "model_name": "google/gemma-2b-it",  # 또는 사용 중인 모델
-        "device": "auto",
-        "max_response_length": 1024,  # 충분히 긴 응답 허용
-        "min_response_length": 100,   # 최소 응답 길이 지정
-        "enable_medgemma": False,
-        "fallback_on_error": True,
-        "generation_params": {
-            "temperature": 0.8,
-            "top_p": 0.9,
-            "repetition_penalty": 1.2,
-            "do_sample": True,
-            "num_return_sequences": 1,
-            "num_beams": 1,
-            "early_stopping": True
-        },
-        "memory_optimization": {
-            "load_in_8bit": False,
-            "load_in_4bit": True,
-            "use_flash_attention": True,
-            "low_cpu_mem_usage": True
-        }
+        "model_name": "google/medgemma_27b-text_it",
+        "api_key": HF_API_KEY,
+        "inference_endpoint": HF_INFERENCE_ENDPOINT,
+        "enable_medgemma": True,
+        "fallback_on_error": True
     }
     
     # AWS Bedrock 설정

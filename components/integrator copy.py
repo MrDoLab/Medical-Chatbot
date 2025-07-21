@@ -1,5 +1,5 @@
-# components/integrator.py (리팩토링된 버전)ㄴㄷ.con
-from typing import Dict, Any, List, Tuple
+# components/integrator.py (리팩토링된 버전)
+from typing import Dict, Any, List
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
@@ -7,8 +7,6 @@ from langchain_openai import ChatOpenAI
 from prompts import system_prompts
 from config import Config
 import traceback
-import os
-import re
 
 class Integrator:
     """다중 소스 정보 통합 담당 클래스 (가중치 적용)"""
@@ -24,18 +22,18 @@ class Integrator:
         # 가중치 변수를 템플릿에 전달하여 동적 프롬프트 생성
         self.integration_prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompts.format("INTEGRATOR", 
-                pubmed_weight=self.source_weights.get("pubmed", 0.94),
-                bedrock_weight=self.source_weights.get("bedrock_kb", 0.95),
+                pubmed_weight=self.source_weights.get("pubmed", 1.0),
+                bedrock_weight=self.source_weights.get("bedrock_kb", 0.9),
                 rag_weight=self.source_weights.get("rag", 0.8),
-                web_weight=self.source_weights.get("tavily", 0.90),  # tavily 값 사용
-                medgemma_weight=self.source_weights.get("medgemma", 0.98)  # Config에 설정된 값 사용
+                web_weight=self.source_weights.get("web", 0.6),
+                medgemma_weight=self.source_weights.get("medgemma", 0.9)
             )),
             ("human", """Question: {question}
 
         Sources with weights:
         {weighted_content}
 
-        Provide integrated medical answer with clear source citations for each piece of information. Use the format [SOURCE_TYPE: specific details] for citations."""),
+        Provide integrated medical answer with clear source citations for each piece of information:"""),
         ])
         
         self.integration_chain = self.integration_prompt | self.llm | StrOutputParser()
@@ -54,40 +52,57 @@ class Integrator:
                 "question": question,
                 "weighted_content": weighted_content
             })
-
-            print("\n==== [통합 결과] ====")
-            print(integrated_answer[:1000] + "..." if len(integrated_answer) > 1000 else integrated_answer)
-     
+            
+            # 출처 표기 형식 개선
+            enhanced_answer = self._enhance_citations(integrated_answer)
+            
             print(f"  ✅ 소스 통합 완료 ({len(source_categorized_docs)}개 소스)")
-            return integrated_answer
+            return enhanced_answer
             
         except Exception as e:
             print(f"  ❌ 통합 실패: {str(e)}")
             print(f"  상세 에러:\n{traceback.format_exc()}")
             return self._fallback_integration(source_categorized_docs)
 
+    def _enhance_citations(self, answer: str) -> str:
+        """출처 표기 형식 개선"""
+        import re
+        
+        # 출처 표기 강조 및 일관성 유지
+        # [SOURCE_TYPE: specific source] 형식을 일관되게 변환
+        
+        # 정규식 패턴
+        citation_pattern = r'\[((?:PubMed|Web|Bedrock_KB|RAG|S3|MedGemma)[^]]*)\]'
+        
+        # 출처 표기 강조
+        def citation_replacer(match):
+            citation = match.group(1)
+            # URL이 있는 경우 형식 변경
+            if " | URL: " in citation:
+                parts = citation.split(" | URL: ")
+                source_info = parts[0]
+                url = parts[1]
+                return f'【{source_info}】({url})'
+            return f'【{citation}】'
+        
+        # 정규식으로 출처 표기 변환
+        enhanced = re.sub(citation_pattern, citation_replacer, answer)
+        
+        # 출처가 없는 문장에 대한 안내 추가
+        if '【' not in enhanced:
+            enhanced += "\n\n(⚠️ 참고: 이 답변은 제공된 정보를 바탕으로 생성되었으나, 구체적인 출처를 표기하지 않았습니다. 정확한 의료 정보는 의료 전문가와 상담하세요.)"
+        
+        return enhanced
+    
     def _build_weighted_content(self, categorized_docs: Dict[str, List[Document]]) -> str:
         """소스별 가중치를 적용한 내용 구성"""
         content_parts = []
-        
-        # 총 토큰 제한
-        total_char_limit = 20000
-        
-        # 소스별 문서 수 계산
-        total_docs = sum(len(docs) for docs in categorized_docs.values() if docs)
         
         for source_type, docs in categorized_docs.items():
             if not docs:
                 continue
                 
             weight = self.source_weights.get(source_type, 0.5)
-            
-            # 소스별 할당량 계산 (MedGemma에 우선권)
-            source_multiplier = 3.0 if source_type == "medgemma" else 2.0
-            source_char_limit = int((total_char_limit * weight * source_multiplier) / max(1, total_docs))
-            
-            # 최소/최대 제한 적용
-            source_char_limit = min(8000, max(1000, source_char_limit))
             
             # 소스 표시 이름 (사용자 친화적)
             source_display_name = {
@@ -102,24 +117,23 @@ class Integrator:
             content_parts.append(f"\n=== {source_display_name} (신뢰도: {weight}) ===")
             
             for i, doc in enumerate(docs):
-                # 출처 정보와 링크 추출 (튜플로 반환)
-                source_info, link = self._extract_source_info(source_type, doc)
+                # 출처 정보 추출 
+                source_info = self._extract_source_info(source_type, doc)
                 
-                # 내용 제한 (소스별 차등 적용)
-                content = doc.page_content[:source_char_limit]
+                # URL 정보 추가
+                url = doc.metadata.get("url", "")
+                if url:
+                    source_info += f" | URL: {url}"
                 
-                # 링크가 있는 경우 마크다운 형식으로 추가
-                if link:
-                    content_parts.append(f"{i+1}. [{source_info}]({link}) {content}")
-                else:
-                    content_parts.append(f"{i+1}. [{source_info}] {content}")
+                # 내용 추가 (300자 제한)
+                content = doc.page_content[:5000]
+                content_parts.append(f"{i+1}. [{source_info}] {content}")
         
         return "\n".join(content_parts)
 
-    def _extract_source_info(self, source_type: str, doc: Document) -> Tuple[str, str]:
-        """문서 유형별 출처 정보와 링크 추출"""
+    def _extract_source_info(self, source_type: str, doc: Document) -> str:
+        """문서 유형별 출처 정보 추출"""
         metadata = doc.metadata or {}
-        link = None
         
         if source_type == "pubmed":
             # PubMed 논문 정보
@@ -128,33 +142,24 @@ class Integrator:
             year = metadata.get("year", "")
             journal = metadata.get("journal", "")
             pmid = metadata.get("pmid", "")
-            source_info = f"PubMed: {author_text} ({year}), {journal}" + (f", PMID:{pmid}" if pmid else "")
-            
-            # PubMed 링크
-            if pmid:
-                link = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
-            else:
-                # DOI 기반 링크
-                doi = metadata.get("doi", "")
-                if doi:
-                    link = f"https://doi.org/{doi}"
+            return f"PubMed: {author_text} ({year}), {journal}" + (f", PMID:{pmid}" if pmid else "")
+    
         
-        elif source_type == "tavily" or source_type == "web":
+        elif source_type == "web":
             # 웹 출처 정보
             title = metadata.get("title", "")
             domain = metadata.get("domain", "")
-            url = metadata.get("url", "")
             
             if not domain and url:
                 # URL에서 도메인 추출
+                import re
                 match = re.search(r'://([^/]+)', url)
                 if match:
                     domain = match.group(1)
                     # www. 제거
                     domain = re.sub(r'^www\.', '', domain)
             
-            source_info = f"Web: {title or domain or 'Unknown website'}"
-            link = url if url else None
+            return f"Web: {title or domain or 'Unknown website'}"
         
         elif source_type == "bedrock_kb":
             # Bedrock KB 문서 정보
@@ -168,28 +173,22 @@ class Integrator:
                 filename = s3_location.split("/")[-1]
                 clean_filename = filename.replace("_", " ").replace(".pdf", "").replace(".txt", "")
                 if clean_filename:
-                    source_info = f"Bedrock KB: {clean_filename}"
-                else:
-                    source_info = f"Bedrock KB: {title or doc_id or category or 'Medical document'}"
-                link = s3_location  # S3 링크
-            else:
-                source_info = f"Bedrock KB: {title or doc_id or category or 'Medical document'}"
-                link = None
+                    return f"Bedrock KB: {clean_filename}"
+            
+            return f"Bedrock KB: {title or doc_id or category or 'Medical document'}"
         
         elif source_type == "s3":
             # S3 문서 정보
             path = metadata.get("source", "")
             title = metadata.get("title", "")
-            s3_url = metadata.get("s3_location", "")
-            
             # 경로에서 파일명만 추출
             if isinstance(path, str):
+                import os
                 filename = os.path.basename(path)
             else:
                 filename = ""
             
-            source_info = f"S3: {title or filename or 'Document'}"
-            link = s3_url if s3_url else path if path and isinstance(path, str) and path.startswith("s3://") else None
+            return f"S3: {title or filename or 'Document'}"
         
         elif source_type == "rag":
             # 내부 RAG 문서 정보
@@ -199,61 +198,36 @@ class Integrator:
             
             # 소스에서 파일명만 추출
             if isinstance(source, str):
+                import os
                 filename = os.path.basename(source)
             else:
                 filename = ""
             
-            source_info = f"RAG: {title or filename or category or 'Document'}"
-            
-            # 소스가 URL이나 S3 경로인 경우 링크로 사용
-            if isinstance(source, str) and (source.startswith("http") or source.startswith("s3://")):
-                link = source
-            else:
-                link = None
+            return f"RAG: {title or filename or category or 'Document'}"
         
         elif source_type == "medgemma":
             # MedGemma 정보
             model = metadata.get("model_name", "MedGemma")
-            model_version = metadata.get("model_version", "")
-            source_info = f"MedGemma: {model}{' v'+model_version if model_version else ''}"
-            
-            # MedGemma의 경우 공식 페이지 링크 (선택적)
-            # 실제 모델 버전에 따라 링크를 다르게 구성할 수 있음
-            if "gemma" in model.lower():
-                link = "https://blog.google/technology/developers/gemma-open-models/"
-            else:
-                link = None
+            return f"MedGemma: {model}"
         
-        else:
-            # 기본 출처 정보
-            source_info = f"{source_type}: {metadata.get('source', 'Unknown')}"
-            url = metadata.get("url", "")
-            link = url if url else None
-        
-        return source_info, link
+        # 기본 출처 정보
+        return f"{source_type}: {metadata.get('source', 'Unknown')}"
     
     def _fallback_integration(self, categorized_docs: Dict[str, List[Document]]) -> str:
         """통합 실패 시 폴백 방법"""
         print("  🔄 기본 통합 방식 사용")
         
-        # 가장 신뢰도 높은 소스부터 사용 (MedGemma 우선)
-        for source_type in ["medgemma", "pubmed", "rag"]:
+        # 가장 신뢰도 높은 소스부터 사용
+        for source_type in ["pubmed", "medgemma", "rag"]:
             if source_type in categorized_docs and categorized_docs[source_type]:
                 docs = categorized_docs[source_type]
                 weight = self.source_weights[source_type]
-                source_info, link = self._extract_source_info(source_type, docs[0])
                 
-                fallback_text = f"""다음 정보를 바탕으로 답변드립니다 (신뢰도: {weight}):
+                return f"""다음 정보를 바탕으로 답변드립니다 (신뢰도: {weight}):
 
-{docs[0].page_content[:800]}
+{docs[0].page_content[:500]}
 
-이 정보는 {source_info} 소스에서 가져온 것입니다."""
-
-                if link:
-                    fallback_text += f"\n참고 링크: {link}"
-                
-                fallback_text += "\n\n정확한 의료 정보를 위해서는 의료 전문가와 상담하시기 바랍니다."
-                
-                return fallback_text
+이 정보는 {source_type} 소스에서 가져온 것입니다. 
+정확한 의료 정보를 위해서는 의료 전문가와 상담하시기 바랍니다."""
         
         return "죄송합니다. 신뢰할 수 있는 정보를 찾을 수 없습니다."
