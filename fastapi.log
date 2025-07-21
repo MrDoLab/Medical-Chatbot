@@ -1,0 +1,145 @@
+nohup: ignoring input
+INFO:     Will watch for changes in these directories: ['/home/ubuntu/Medical-Chatbot']
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+INFO:     Started reloader process [19296] using StatReload
+INFO:     Started server process [19299]
+INFO:     Waiting for application startup.
+INFO:     ASGI 'lifespan' protocol appears unsupported.
+INFO:     Application startup complete.
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/uvicorn/protocols/http/h11_impl.py", line 412, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/uvicorn/middleware/proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/uvicorn/middleware/asgi2.py", line 16, in __call__
+    instance = self.app(scope)
+               ^^^^^^^^^^^^^^^
+TypeError: Flask.__call__() missing 1 required positional argument: 'start_response'
+⚠️ pytesseract 모듈을 찾을 수 없습니다. OCR 기능이 비활성화됩니다.
+⚠️ pytesseract 모듈을 찾을 수 없습니다. OCR 기능이 비활성화됩니다.
+✅ 8 프롬프트를 YAML에서 로드했습니다
+📝 의료 전문가용 출력 포맷터 (LLM 버전) 초기화 완료
+💭 메모리 관리자 초기화 완료
+✅ PubMed 검색기 초기화 완료
+🧠 MedGemma 초기화 중...
+🔄 Inference Endpoint 연결 테스트 중...
+✅ Inference Endpoint 연결 성공
+✅ MedGemma 초기화 완료
+✅ MedGemma 검색기 초기화 완료
+✅ Tavily 웹 검색 초기화 완료
+📝 Bedrock KB ID 확인됨: IZJR1RYKEY
+🔍 Bedrock Retriever 초기화 완료 (KB_ID: IZJR1RYKEY)
+✅ Bedrock Retriever 초기화 성공
+🚀 병렬 검색기 초기화 완료 (활성 소스: medgemma, pubmed, tavily, bedrock_kb)
+INFO:     39.123.47.113:57427 - "GET /api/news HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/uvicorn/protocols/http/h11_impl.py", line 412, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/uvicorn/middleware/proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/uvicorn/middleware/asgi2.py", line 16, in __call__
+    instance = self.app(scope)
+               ^^^^^^^^^^^^^^^
+TypeError: Flask.__call__() missing 1 required positional argument: 'start_response'
+INFO:     39.123.47.113:57464 - "GET /api/news HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/uvicorn/protocols/http/h11_impl.py", line 412, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/uvicorn/middleware/proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/uvicorn/middleware/asgi2.py", line 16, in __call__
+    instance = self.app(scope)
+               ^^^^^^^^^^^^^^^
+TypeError: Flask.__call__() missing 1 required positional argument: 'start_response'
+INFO:     59.12.93.119:54794 - "GET /api/news HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/uvicorn/protocols/http/h11_impl.py", line 412, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/uvicorn/middleware/proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/uvicorn/middleware/asgi2.py", line 16, in __call__
+    instance = self.app(scope)
+               ^^^^^^^^^^^^^^^
+TypeError: Flask.__call__() missing 1 required positional argument: 'start_response'
+INFO:     39.123.47.113:57468 - "GET /api/news HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/uvicorn/protocols/http/h11_impl.py", line 412, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/uvicorn/middleware/proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/uvicorn/middleware/asgi2.py", line 16, in __call__
+    instance = self.app(scope)
+               ^^^^^^^^^^^^^^^
+TypeError: Flask.__call__() missing 1 required positional argument: 'start_response'
+INFO:     39.123.47.113:57469 - "GET /api/news HTTP/1.1" 500 Internal Server Error
+WARNING:  StatReload detected changes in 'fast_api_server.py'. Reloading...
+INFO:     Shutting down
+INFO:     Finished server process [19299]
+INFO:     Started server process [20283]
+INFO:     Waiting for application startup.
+INFO:     ASGI 'lifespan' protocol appears unsupported.
+INFO:     Application startup complete.
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/uvicorn/protocols/http/h11_impl.py", line 412, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/uvicorn/middleware/proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/uvicorn/middleware/asgi2.py", line 16, in __call__
+    instance = self.app(scope)
+               ^^^^^^^^^^^^^^^
+TypeError: Flask.__call__() missing 1 required positional argument: 'start_response'
+⚠️ pytesseract 모듈을 찾을 수 없습니다. OCR 기능이 비활성화됩니다.
+⚠️ pytesseract 모듈을 찾을 수 없습니다. OCR 기능이 비활성화됩니다.
+✅ 8 프롬프트를 YAML에서 로드했습니다
+📝 의료 전문가용 출력 포맷터 (LLM 버전) 초기화 완료
+💭 메모리 관리자 초기화 완료
+✅ PubMed 검색기 초기화 완료
+🧠 MedGemma 초기화 중...
+🔄 Inference Endpoint 연결 테스트 중...
+✅ Inference Endpoint 연결 성공
+✅ MedGemma 초기화 완료
+✅ MedGemma 검색기 초기화 완료
+✅ Tavily 웹 검색 초기화 완료
+📝 Bedrock KB ID 확인됨: IZJR1RYKEY
+🔍 Bedrock Retriever 초기화 완료 (KB_ID: IZJR1RYKEY)
+✅ Bedrock Retriever 초기화 성공
+🚀 병렬 검색기 초기화 완료 (활성 소스: medgemma, pubmed, tavily, bedrock_kb)
+INFO:     39.123.47.113:57533 - "GET /api/news HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/uvicorn/protocols/http/h11_impl.py", line 412, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/uvicorn/middleware/proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/uvicorn/middleware/asgi2.py", line 16, in __call__
+    instance = self.app(scope)
+               ^^^^^^^^^^^^^^^
+TypeError: Flask.__call__() missing 1 required positional argument: 'start_response'
+INFO:     59.12.93.119:55022 - "GET /api/news HTTP/1.1" 500 Internal Server Error
+WARNING:  StatReload detected changes in 'fast_api_server.py'. Reloading...
+INFO:     Shutting down
+INFO:     Finished server process [20283]
+INFO:     Started server process [20393]
+INFO:     Waiting for application startup.
+INFO:     ASGI 'lifespan' protocol appears unsupported.
+INFO:     Application startup complete.

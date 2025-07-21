@@ -1,0 +1,20 @@
+INFO:     Started server process [3873]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+ERROR:    [Errno 98] error while attempting to bind on address ('0.0.0.0', 8000): address already in use
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+✅ 8 프롬프트를 YAML에서 로드했습니다
+📝 의료 전문가용 출력 포맷터 (LLM 버전) 초기화 완료
+💭 메모리 관리자 초기화 완료
+✅ PubMed 검색기 초기화 완료
+🧠 MedGemma 초기화 중...
+🔄 Inference Endpoint 연결 테스트 중...
+✅ Inference Endpoint 연결 성공
+✅ MedGemma 초기화 완료
+✅ MedGemma 검색기 초기화 완료
+✅ Tavily 웹 검색 초기화 완료
+📝 Bedrock KB ID 확인됨: IZJR1RYKEY
+🔍 Bedrock Retriever 초기화 완료 (KB_ID: IZJR1RYKEY)
+✅ Bedrock Retriever 초기화 성공
+🚀 병렬 검색기 초기화 완료 (활성 소스: medgemma, pubmed, tavily, bedrock_kb)
