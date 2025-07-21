@@ -590,5 +590,61 @@
     "response_time": 21.80430817604065,
     "sources_used": 0,
     "user_id": "user_1751286554"
+  },
+  {
+    "timestamp": "2025-06-30T13:03:29.215165",
+    "question": "Trauma 환자에서 GCS 계산 방법은?",
+    "answer": "**[WPW 증후군과 외상 시 GCS 계산]**\n\n**핵심 요약**\n• WPW 증후군 환자에서 외상 발생 시 글래스고 혼수 척도(GCS)는 일반적인 방식으로 계산됩니다.\n• WPW 증후군은 GCS 점수에 직접적인 영향을 미치지 않습니다.\n• 외상 후 심전도 검사를 고려하는 것이 중요합니다.\n\n**진단 접근**\n1. 병력 청취\n  • WPW 증후군의 병력 확인\n  • 외상 발생 상황 및 증상 평가\n\n2. 신체 검진\n  • GCS 평가: 눈 개방, 구두반응, 운동반응\n  • 외상 관련 신체 소견 확인\n\n3. 검사\n  • 필수 검사: 심전도, GCS 평가\n  • 추가 검사: 두부 CT, 혈액 검사\n  • 진단 기준: GCS는 다음과 같이 평가됩니다:\n    - 눈 개방: 자발적(4점), 소리 자극에 반응(3점), 통증 자극에 반응(2점), 반응 없음(1점)\n    - 구두반응: 지남력 있음(5점), 혼란(4점), 부적절한 단어(3점), 이해할 수 없는 소리(2점), 반응 없음(1점)\n    - 운동반응: 명령에 따름(6점), 통증 자극에 국소적 반응(5점), 통증 자극에 회피(4점), 굴곡 반응(3점), 신전 반응(2점), 반응 없음(1점)\n\n**치료 계획**\n\n**1차 약물치료**\n• 약물명: [해당 없음]\n• 용량: [해당 없음]\n• 용법: [해당 없음]\n• 기간: [해당 없음]\n• 주의사항: [해당 없음]\n\n대체 치료:\n  • 외상 치료에 집중\n  • WPW 증후군의 심전도 모니터링\n\n**모니터링 및 추적관찰**\n• 효과 평가: GCS 점수 변화\n• 부작용 감시: 외상 관련 합병증\n• 추적 일정: 외상 후 24시간 내 재평가\n\n**환자 교육**\n• 생활습관 개선: 외상 예방\n• 주의사항: WPW 증후군의 증상 인지\n• 응급상황 대처: 심전도 이상 시 즉각적인 의료 상담\n\n**참고문헌**\n1. [MEDGEMMA] 제목 없음. medgemma_fallback\n2. [PUBMED] Mustafa Dogdus, Ferhat Dindas, Oguzhan Ekrem Turan et al.. Evaluation of left atrial and left ventricular functions in patients with Wolff-Parkinson-White syndrome before and after radiofrequency catheter ablation using three-dimensional speckle tracking echocardiography.. Echocardiography (Mount Kisco, N.Y.). 2022.\n3. [BEDROCK_KB] Document ID: bedrock_kb\n\n(⚠️ 참고: 이 답변은 제공된 정보를 바탕으로 생성되었으나, 구체적인 출처를 표기하지 않았습니다. 정확한 의료 정보는 의료 전문가와 상담하세요.)",
+    "response_time": 31.770074367523193,
+    "sources_used": 0,
+    "user_id": "user_1751284101"
+  },
+  {
+    "timestamp": "2025-06-30T13:04:24.092895",
+    "question": "Trauma 환자에서 GCS 계산 방법은?",
+    "answer": "**[Glasgow Coma Scale (GCS)]**\n\n**핵심 요약**\n\n• GCS는 외상 환자의 의식 수준을 평가하는 도구로, 눈 뜨기, 언어 반응, 운동 반응의 세 가지 항목을 평가하여 총점을 산출합니다.\n• 총점은 3점에서 15점까지이며, 낮은 점수일수록 중증 외상을 의미합니다.\n• 응급 상황에서 환자의 초기 상태를 평가하고, 치료 경과를 모니터링하는 데 사용됩니다.\n\n**진단 접근**\n\n1. 병력 청취\n \n• 중요 병력 사항: 외상 발생 시점, 외상 기전, 의식 변화 여부\n \n• 위험 인자 평가: 두부 외상, 의식 소실, 신경학적 증상\n\n2. 신체 검진\n \n• 주요 소견: 의식 수준, 반응성\n \n• 특징적 징후: 눈 뜨기, 언어 반응, 운동 반응\n\n3. 검사\n \n• 필수 검사: GCS 평가\n \n• 추가 검사: 뇌 CT, MRI\n \n• 진단 기준: \n    - 눈 뜨기: 자발적(4점), 소리에 반응(3점), 통증에 반응(2점), 반응 없음(1점)\n    - 언어 반응: 지남력 있음(5점), 혼란스러움(4점), 부적절한 단어(3점), 이해할 수 없는 소리(2점), 반응 없음(1점)\n    - 운동 반응: 명령에 따름(6점), 통증에 국소적 반응(5점), 통증에 굴곡 반응(4점), 통증에 비정상적 굴곡(3점), 통증에 비정상적 신전(2점), 반응 없음(1점)\n\n**치료 계획**\n\n**1차 약물치료**\n\n• 약물명: 해당 없음\n• 용량: 해당 없음\n• 용법: 해당 없음\n• 기간: 해당 없음\n• 주의사항: 해당 없음\n\n대체 치료:\n \n• 해당 없음\n\n**모니터링 및 추적관찰**\n\n• 효과 평가: GCS 점수 변화\n• 부작용 감시: 신경학적 악화 여부\n• 추적 일정: 정기적인 신경학적 평가\n\n**환자 교육**\n\n• 생활습관 개선: 외상 예방 교육\n• 주의사항: 의식 변화 시 즉시 의료기관 방문\n• 응급상황 대처: 응급실 방문 및 즉각적인 의료 평가\n\n**참고문헌**\n\n1. [지식 베이스] TABLE\n17.2 Glasgow Coma Scale. Bedrock_KB.\n2. [웹 검색] Glasgow Coma Scale - StatPearls - NCBI Bookshelf. https://www.ncbi.nlm.nih.gov/books/NBK513298/\n\n(⚠️ 참고: 이 답변은 제공된 정보를 바탕으로 생성되었으나, 구체적인 출처를 표기하지 않았습니다. 정확한 의료 정보는 의료 전문가와 상담하세요.)",
+    "response_time": 29.174047708511353,
+    "sources_used": 0,
+    "user_id": "user_1751284101"
+  },
+  {
+    "timestamp": "2025-07-01T02:47:30.931642",
+    "question": "Trauma 환자에서 GCS 계산 방법은?",
+    "answer": "**핵심 요약**\n글래스고 혼수 척도(GCS)는 외상 환자의 의식 수준을 평가하기 위한 도구로, 눈 열기, 언어 반응, 운동 반응의 세 가지 항목을 점수화하여 총점을 계산합니다. 최대 점수는 15점이며, 점수가 낮을수록 의식 수준이 낮음을 의미합니다[2,5].\n\n**상세 정보**\n- **눈 열기 (Eye Opening)**\n  - 자발적 (Spontaneous): 4점\n  - 음성 자극에 반응 (To voice): 3점\n  - 통증 자극에 반응 (To pain): 2점\n  - 반응 없음 (None): 1점\n\n- **언어 반응 (Verbal Response)**\n  - 지남력 있음 (Oriented): 5점\n  - 혼란스러움 (Confused): 4점\n  - 부적절한 단어 사용 (Inappropriate words): 3점\n  - 이해할 수 없는 소리 (Incomprehensible sounds): 2점\n  - 반응 없음 (None): 1점\n\n- **운동 반응 (Motor Response)**\n  - 명령에 따름 (Obeys commands): 6점\n  - 통증에 국소 반응 (Localizes pain): 5점\n  - 통증에 회피 반응 (Withdraws from pain): 4점\n  - 비정상 굴곡 (Decorticate posturing): 3점\n  - 비정상 신전 (Decerebrate posturing): 2점\n  - 반응 없음 (None): 1점\n\n**진단 기준**\n- GCS 점수는 3점에서 15점 사이로, 13점 이하일 경우 혼수 상태를 나타낼 수 있습니다[2,5].\n\n**참고문헌**\n2. [bedrock_kb] CHAPTER 17 Management of Acute Trauma 389. Glasgow Coma Scale.\n5. [bedrock_kb] 2. TRAUMATIC BRAIN INJURY. TABLE 2-1 Glasgow Coma Scale.\n\n(⚠️ 참고: 이 답변은 제공된 정보를 바탕으로 생성되었으나, 구체적인 출처를 표기하지 않았습니다. 정확한 의료 정보는 의료 전문가와 상담하세요.)",
+    "response_time": 45.68593502044678,
+    "sources_used": 0,
+    "user_id": "user_1751337981"
+  },
+  {
+    "timestamp": "2025-07-01T12:33:39.313680",
+    "question": "의식저하 환자에서 hypoglycemia rule-out 순서는?",
+    "answer": "**핵심 요약**\n의식저하 환자에서 저혈당증을 배제하기 위한 순서는 신속한 혈당 측정과 필요 시 정맥 포도당 투여를 포함합니다. 저혈당증이 의심될 경우, 즉각적인 치료가 중요합니다[1,2].\n\n**상세 정보**\n- 병태생리 및 기전: 저혈당증은 혈당이 50 mg/dL 이하로 떨어질 때 발생하며, 인슐린 과다 분비, 간 기능 장애, 약물 중독 등이 원인이 될 수 있습니다[3].\n- 임상 양상: 저혈당증은 신경저하증상(혼수, 발작)과 자율신경계 증상(발한, 떨림)을 유발할 수 있습니다[4].\n\n**진단 기준**\n- 혈당 측정: 혈당이 60 mg/dL 이하일 경우 저혈당증으로 간주합니다[3].\n- 추가 검사: 인슐린, C-펩타이드, 프로인슐린 수치를 측정하여 인슐린 과다 여부를 확인합니다[3].\n\n**치료 방법**\n1차 치료: 정맥 포도당 투여\n- 용량: 50% 포도당 50mL 정맥 주사\n- 투여 경로: 정맥\n- 모니터링: 혈당 수치 지속 모니터링\n\n대체 치료:\n- 경구 포도당 섭취가 불가능한 경우 글루카곤 주사[5].\n\n**주의사항 및 금기**\n- 절대 금기: 경구 섭취가 불가능한 환자에게 경구 포도당 투여 금지\n- 약물 상호작용: 인슐린 및 혈당 강하제와의 상호작용 주의\n- 특수 집단 주의사항: 간 기능 장애 환자에서 포도당 대사 주의\n\n**참고문헌**\n1. 【PubMed 논문】 Nesidioblastosis: an uncommon complication seen post Roux-en-Y gastric bypass. PubMed. 2023;36571473.\n2. 【PubMed 논문】 Prehospital management of exertional heat stroke at sports competitions. PubMed. 2023;33888465.\n3. [지식 베이스] Bedrock_KB. Hypoglycemia management. 2023.\n4. [웹 검색] Mayo Clinic. Hypoglycemia - Symptoms and causes. 2023.\n5. [웹 검색] Mayo Clinic. Hypoglycemia - Diagnosis and treatment. 2023.",
+    "response_time": 20.012415170669556,
+    "sources_used": 0,
+    "user_id": "user_1751373133"
+  },
+  {
+    "timestamp": "2025-07-03T08:23:55.047376",
+    "question": "Kawasaki disease의 진단 기준과 치료는?",
+    "answer": "**[가와사키병]**\n\n**핵심 요약**\n\n• 가와사키병은 주로 소아에게 발생하는 급성 염증성 질환으로, 적시에 진단 및 치료하지 않으면 관상동맥 병변을 초래할 수 있습니다.\n• 진단 기준은 5일 이상의 발열과 함께 5가지 주요 증상 중 4가지 이상을 포함합니다.\n• 치료는 고용량의 정맥 내 면역글로불린(IVIG)과 아스피린(Aspirin)을 사용하여 염증을 줄이고 심장 손상을 예방하는 것이 표준입니다.\n\n**진단 접근**\n\n1. 병력 청취\n \n• 중요 병력 사항: 발열, 발진, 결막염, 구강 점막 변화, 림프절 비대\n \n• 위험 인자 평가: 5세 이하 소아, 아시아계 특히 일본과 한국에서 높은 발생률\n\n2. 신체 검진\n \n• 주요 소견: 양측성 비화농성 결막염, 입술 및 구강 점막의 변화\n \n• 특징적 징후: 손발의 부종 및 홍반, 경부 림프절 비대\n\n3. 검사\n \n• 필수 검사: 혈액 검사(염증 표지자 상승), 심초음파(관상동맥 평가)\n \n• 추가 검사: 필요 시 추가 영상 검사\n \n• 진단 기준: 5일 이상의 발열과 함께 5가지 증상 중 4가지 이상 충족\n\n**치료 계획**\n\n**1차 약물치료**\n\n• 약물명: 정맥 내 면역글로불린(IVIG)\n• 용량: 2g/kg 단회 투여\n• 용법: 정맥 주사\n• 기간: 단회\n• 주의사항: 심초음파를 통한 관상동맥 상태 평가\n\n대체 치료:\n \n• 금기 시: 코르티코스테로이드 사용 고려\n \n• 치료 반응 없을 시: 추가 IVIG 또는 면역억제제 사용 고려\n\n**모니터링 및 추적관찰**\n\n• 효과 평가: 심초음파를 통한 관상동맥 상태\n• 부작용 감시: IVIG에 대한 알레르기 반응\n• 추적 일정: 정기적인 심초음파 검사\n\n**환자 교육**\n\n• 생활습관 개선: 적절한 휴식과 수분 섭취\n• 주의사항: 아스피린 복용 시 출혈 주의\n• 응급상황 대처: 호흡 곤란이나 심한 발진 발생 시 즉시 병원 방문\n\n**참고문헌**\n\n1. 【PubMed 논문】 2021 American College of Rheumatology/Vasculitis Foundation Guideline for the Management of Kawasaki Disease. PubMed; 2021.\n2. [지식 베이스] Intravenous immunoglobulin is the standard treatment for KD, decreasing the risk of coronary artery aneurysms by more than 70%.\n3. [웹 검색] Recognizing Kawasaki disease - PMC. PMC;\n2001.\n4. [웹 검색] Kawasaki disease recognition and treatment - PMC. PMC;\n2020.",
+    "response_time": 24.50003933906555,
+    "sources_used": 0,
+    "user_id": "user_1751531007"
+  },
+  {
+    "timestamp": "2025-07-12T17:16:37.591828",
+    "question": " \"SIADH의 진단 기준은 무엇인가?\"\n",
+    "answer": "**핵심 요약**\nSIADH(부적절한 항이뇨호르몬 분비 증후군)의 진단은 주로 저나트륨혈증, 저삼투압성 혈청, 부적절하게 농축된 소변, 정상적인 신장 및 부신 기능, 그리고 정상적인 혈량 상태를 기반으로 합니다. 다른 원인 질환을 배제하는 것이 중요합니다[1,2].\n\n**진단 기준**\n- **저나트륨혈증**: 혈청 나트륨 농도가 135 mEq/L 미만[1].\n- **저삼투압성 혈청**: 혈청 삼투압이 275 mOsm/kg 미만[1].\n- **부적절하게 농축된 소변**: 소변 삼투압이 100 mOsm/kg 이상이며, 혈청 삼투압보다 높음[1].\n- **소변 나트륨 농도**: 40 mEq/L 이상 (단, 이뇨제 복용 시 제외 가능)[1].\n- **정상적인 신장 기능**: 혈청 크레아티닌 및 요산 수치가 정상 범위 내[1].\n- **정상적인 부신 기능**: 부신 기능 저하를 배제해야 함[1].\n- **정상적인 갑상선 기능**: 갑상선 기능 저하증을 배제해야 함[1].\n- **정상적인 혈량 상태**: 탈수나 과부하 상태가 아닌 정상적인 혈량 상태[1].\n- **원인 질환 배제**: 폐 질환, 중추신경계 질환, 약물 부작용 등 배제[1].\n\n**참고문헌**\n1. 【MedGemma: google/medgemma_27b_text_it】 SIADH 진단 기준. MedGemma 의료 지식 응답. 2025.\n2. 【PubMed: Aaron Pinkhasov 외 (2021), Journal of psychosomatic research, PMID:34739943】 Management of SIADH-related hyponatremia due to psychotropic medications. Journal of psychosomatic research. 2021.",
+    "response_time": 78.80415534973145,
+    "sources_used": 0,
+    "user_id": "user_1752340507"
+  },
+  {
+    "timestamp": "2025-07-12T17:17:13.350351",
+    "question": " \"SIADH의 진단 기준은 무엇인가?\"\n",
+    "answer": "**핵심 요약**\nSIADH(항이뇨호르몬 부적절 분비 증후군)의 진단은 저나트륨혈증, 저삼투압성 혈액, 적절한 체액 상태, 높은 요 나트륨 농도 및 높은 요 삼투압을 포함한 여러 기준을 충족해야 합니다. 또한, 신장, 부신, 갑상선 기능이 정상임을 확인하고 다른 원인을 배제해야 합니다[1,2].\n\n**진단 기준**\n- **저나트륨혈증 (Hyponatremia):** 혈청 나트륨 농도 < 135 mEq/L[1].\n- **저삼투압성 혈액 (Hypotonic Hyponatremia):** 혈청 삼투압 < 275 mOsm/kg H2O[1].\n- **적절한 체액 상태 (Euvolemia):** 부종이나 탈수 증상이 없는 상태[1].\n- **높은 요 나트륨 농도:** 요 나트륨 > 20 mEq/L[1].\n- **높은 요 삼투압:** 요 삼투압 > 100 mOsm/kg H2O[1].\n- **정상 신장, 부신, 갑상선 기능:** 각각의 기능 검사를 통해 확인[1,2].\n\n**진단 과정**\n1. **병력 청취 및 신체 검진:** 저나트륨혈증의 원인이 될 수 있는 약물 복용력, 기저 질환, 증상 등을 확인합니다[1].\n2. **혈액 검사:** 혈청 나트륨, 삼투압, BUN, 크레아티닌, 코르티솔, TSH, T4 등을 측정합니다[1].\n3. **소변 검사:** 요 나트륨, 요 삼투압 등을 측정합니다[1].\n4. **다른 원인 배제:** 신장 질환, 부신 질환, 갑상선 질환, 심부전, 간경변 등 저나트륨혈증을 유발할 수 있는 다른 원인을 배제합니다[1,2].\n5. **SIADH 진단 기준 충족 여부 확인:** 위에서 제시된 SIADH 진단 기준을 모두 충족하는지 확인합니다[1].\n\n**참고문헌**\n1. 【MedGemma: google/medgemma_27b_text_it】 SIADH 진단 기준 및 과정 설명.\n2. [Bedrock KB: Bluprints Obstetrics and Gynecology] SIADH의 임상적 특징 및 관리.",
+    "response_time": 48.71063828468323,
+    "sources_used": 0,
+    "user_id": "user_1752340578"
   }
 ]
