@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 # 상수 정의
 DEFAULT_REGION = 'us-east-2'
 DEFAULT_BUCKET = 'aws-medical-chatbot'
-DEFAULT_FUNCTION = 'arn:aws:lambda:us-east-2:481371222694:function:medical-embedding-search'
+DEFAULT_FUNCTION = 'medical-embedding-search'
 
 class S3Retriever:
     """S3 기반 임베딩 검색 담당 클래스"""
