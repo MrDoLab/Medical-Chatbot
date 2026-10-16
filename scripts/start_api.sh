@@ -1,7 +1,9 @@
 #!/bin/bash
 
-source ~/Medical-Chatbot/venv/bin/activate
-cd ~/Medical-Chatbot
+cd "$(dirname "$0")/.."
+if [ -f venv/bin/activate ]; then
+  source venv/bin/activate
+fi
 
 # ✅ 이미 8000 포트가 떠 있으면 실행하지 않음
 if lsof -i :8000 > /dev/null

@@ -1,7 +1,7 @@
 # qa_evaluator.py
 """
 의료 RAG 시스템 QA 평가 도구
-- 프로젝트 루트에 위치하는 독립적인 평가 시스템
+- 저장소 루트에서 python scripts/qa_evaluator.py 로 실행하는 평가 도구
 - config.py의 OpenAI API 키 자동 로드
 - rag_system.py와 연동하여 전체 시스템 평가
 """
@@ -18,6 +18,9 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
 from pydantic import BaseModel, Field
 import statistics
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # config.py에서 OpenAI API 키 로드
 try:

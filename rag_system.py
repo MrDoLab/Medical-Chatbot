@@ -12,7 +12,7 @@ import langdetect
 from langdetect import detect, detect_langs
     
 from config import Config
-#from question_logger import QuestionLogger
+#from scripts.question_logger import QuestionLogger
 from components.local_retriever import LocalRetriever
 from components.pubMed_searcher import PubMedSearcher
 from components.evaluator import Evaluator

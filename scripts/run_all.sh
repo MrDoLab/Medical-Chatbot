@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd "$(dirname "$0")/.."
+
 echo "✅ React 서버 실행 중..."
 cd frontend
 npm run dev &
