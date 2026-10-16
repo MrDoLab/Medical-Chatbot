@@ -17,8 +17,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173",
         "http://127.0.0.1:5173",
-        "http://44.208.140.83:5173",
-	"http://medlinkbot.com",
+        "http://medlinkbot.com",
         "https://medlinkbot.com",
         "http://www.medlinkbot.com",
         "https://www.medlinkbot.com"],  # 또는 ["*"]

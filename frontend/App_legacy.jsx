@@ -12,7 +12,7 @@ export default function App() {
 
   const handleSessionSelect = async (sessionId) => {
     try {
-      const res = await fetch(`http://44.208.140.83:8000/api/load?session_id=${sessionId}`);
+      const res = await fetch(`http://localhost:8000/api/load?session_id=${sessionId}`);
       const data = await res.json();
       setChatHistory(data);
       localStorage.setItem("chatHistory", JSON.stringify(data));  // ✅ 로컬 저장

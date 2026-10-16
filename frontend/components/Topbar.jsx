@@ -8,7 +8,7 @@ export default function Topbar({ setShowSettings, language = "EN", setLanguage =
   ]);
 
   useEffect(() => {
-    const apiUrl = "http://44.208.140.83:8001/api/news";
+    const apiUrl = "http://localhost:8001/api/news";
 
     fetch(apiUrl)
       .then(res => res.json())
